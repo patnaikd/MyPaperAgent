@@ -9,8 +9,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from src.agents.qa_agent import QAAgent
+from src.agents.quiz_generator import QuizGenerator
+from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager, PaperManagerError, PaperNotFoundError
+from src.discovery.arxiv_search import ArxivSearch
 from src.rag.retriever import RAGRetriever, index_all_papers
 from src.utils.config import get_config
 
@@ -97,25 +101,36 @@ def add_paper(
 
 
 @cli.command()
-@click.argument("paper_id", type=str)
+@click.argument("paper_id", type=int)
 @click.option("--level", type=click.Choice(["quick", "detailed", "full"]), default="detailed")
-def summarize(paper_id: str, level: str) -> None:
+@click.option("--no-save", is_flag=True, help="Don't save summary as note")
+def summarize(paper_id: int, level: str, no_save: bool) -> None:
     """Generate AI summary of a paper.
 
     Levels:
-    - quick: Abstract-level summary
+    - quick: Abstract-level summary (2-3 paragraphs)
     - detailed: Key findings and methodology
     - full: Comprehensive analysis
     """
-    console.print(f"[yellow]Summarizing paper {paper_id} (level: {level})[/yellow]")
+    try:
+        console.print(f"\n[bold cyan]Generating {level} summary for paper {paper_id}[/bold cyan]\n")
 
-    # TODO: Implement summarization
-    # - Retrieve paper from database
-    # - Use Claude Agent to generate summary
-    # - Store summary in database
-    # - Display to user
+        # Initialize agent
+        agent = SummarizationAgent()
 
-    console.print("[red]Not implemented yet[/red]")
+        # Generate summary
+        with console.status(f"[bold yellow]Generating {level} summary with Claude..."):
+            summary = agent.summarize_paper(paper_id, level=level, save_as_note=not no_save)
+
+        # Display summary
+        console.print(Panel(summary, title=f"[bold green]{level.title()} Summary[/bold green]", border_style="green"))
+
+        if not no_save:
+            console.print(f"\n[dim]✓ Summary saved as AI-generated note[/dim]\n")
+
+    except Exception as e:
+        console.print(f"\n[bold red]✗ Error:[/bold red] {e}\n", style="red")
+        sys.exit(1)
 
 
 @cli.command()
@@ -161,37 +176,75 @@ def search(
 
 
 @cli.command()
-@click.argument("paper_id", type=str)
+@click.argument("paper_id", type=int)
 @click.argument("question", type=str)
-def ask(paper_id: str, question: str) -> None:
+def ask(paper_id: int, question: str) -> None:
     """Ask a question about a specific paper."""
-    console.print(f"[yellow]Question: {question}[/yellow]")
+    try:
+        console.print(f"\n[bold cyan]Question:[/bold cyan] {question}\n")
 
-    # TODO: Implement Q&A
-    # - Retrieve paper
-    # - Use RAG to find relevant sections
-    # - Generate answer with Claude
-    # - Display with citations
+        # Initialize Q&A agent
+        agent = QAAgent()
 
-    console.print("[red]Not implemented yet[/red]")
+        # Get answer
+        with console.status("[bold yellow]Generating answer with Claude..."):
+            result = agent.answer_question(question, paper_id=paper_id)
+
+        # Display answer
+        console.print(Panel(result["answer"], title="[bold green]Answer[/bold green]", border_style="green"))
+
+        # Show sources
+        if result["sources"]:
+            console.print("\n[bold]Sources:[/bold]")
+            for source in result["sources"]:
+                console.print(f"  • Paper {source['paper_id']}: {source['title']}")
+
+        console.print()
+
+    except Exception as e:
+        console.print(f"\n[bold red]✗ Error:[/bold red] {e}\n", style="red")
+        sys.exit(1)
 
 
 @cli.command()
-@click.argument("paper_id", type=str)
-@click.option("--length", "-l", default=10, help="Number of questions")
-@click.option("--difficulty", type=click.Choice(["easy", "medium", "hard", "adaptive"]))
-def quiz(paper_id: str, length: int, difficulty: Optional[str]) -> None:
-    """Take an AI-generated quiz on a paper."""
-    console.print(f"[yellow]Starting quiz for paper {paper_id}[/yellow]")
+@click.argument("paper_id", type=int)
+@click.option("--length", "-l", default=5, help="Number of questions")
+@click.option("--difficulty", type=click.Choice(["easy", "medium", "hard", "adaptive"]), default="adaptive")
+def quiz(paper_id: int, length: int, difficulty: str) -> None:
+    """Generate and display quiz questions for a paper.
 
-    # TODO: Implement quiz
-    # - Generate questions using Claude
-    # - Present questions interactively
-    # - Track answers
-    # - Provide feedback
-    # - Store results
+    Questions are saved to the database for future review.
+    """
+    try:
+        console.print(f"\n[bold cyan]Generating {length} {difficulty} quiz questions for paper {paper_id}[/bold cyan]\n")
 
-    console.print("[red]Not implemented yet[/red]")
+        # Initialize generator
+        generator = QuizGenerator()
+
+        # Generate questions
+        with console.status(f"[bold yellow]Generating {length} questions with Claude..."):
+            questions = generator.generate_quiz(paper_id, num_questions=length, difficulty=difficulty)
+
+        if not questions:
+            console.print("[yellow]Failed to generate questions. Please try again.[/yellow]\n")
+            return
+
+        console.print(f"[bold green]Generated {len(questions)} questions![/bold green]\n")
+
+        # Display questions
+        for i, q in enumerate(questions, 1):
+            console.print(f"[bold cyan]Question {i}:[/bold cyan] {q['question']}")
+            console.print(f"[bold green]Answer:[/bold green] {q['answer']}")
+            if q.get('explanation'):
+                console.print(f"[dim]Explanation: {q['explanation']}[/dim]")
+            console.print(f"[dim]Difficulty: {q.get('difficulty', 'medium')}[/dim]")
+            console.print()
+
+        console.print(f"[dim]✓ Questions saved to database for future review[/dim]\n")
+
+    except Exception as e:
+        console.print(f"\n[bold red]✗ Error:[/bold red] {e}\n", style="red")
+        sys.exit(1)
 
 
 @cli.command()
@@ -216,29 +269,77 @@ def note(paper_id: int, content: str, section: Optional[str]) -> None:
 
 @cli.command()
 @click.option("--topic", "-t", help="Topic to search for")
-@click.option("--similar-to", help="Find papers similar to this paper_id")
-@click.option("--citations-of", help="Find papers citing this paper_id")
+@click.option("--author", "-a", help="Search by author name")
+@click.option("--category", "-c", help="arXiv category (e.g., cs.AI, cs.LG)")
 @click.option("--limit", "-l", default=10, help="Number of papers to find")
 def discover(
     topic: Optional[str],
-    similar_to: Optional[str],
-    citations_of: Optional[str],
+    author: Optional[str],
+    category: Optional[str],
     limit: int,
 ) -> None:
-    """Discover new papers."""
-    if not any([topic, similar_to, citations_of]):
-        console.print("[red]Error: Provide --topic, --similar-to, or --citations-of[/red]")
+    """Discover papers on arXiv."""
+    if not any([topic, author, category]):
+        console.print("[red]Error: Provide --topic, --author, or --category[/red]\n")
         return
 
-    console.print("[yellow]Discovering papers...[/yellow]")
+    try:
+        console.print("\n[bold cyan]Discovering papers on arXiv...[/bold cyan]\n")
 
-    # TODO: Implement paper discovery
-    # - Search arXiv, Semantic Scholar, etc.
-    # - Rank by relevance
-    # - Display results
-    # - Allow quick add to library
+        # Initialize search
+        searcher = ArxivSearch(max_results=limit)
 
-    console.print("[red]Not implemented yet[/red]")
+        # Perform search
+        with console.status("[bold yellow]Searching arXiv..."):
+            if topic:
+                results = searcher.search_by_topic(topic)
+            elif author:
+                results = searcher.search_by_author(author)
+            else:  # category
+                results = searcher.search_recent(category=category)
+
+        if not results:
+            console.print("[yellow]No papers found.[/yellow]\n")
+            return
+
+        console.print(f"[bold green]Found {len(results)} papers![/bold green]\n")
+
+        # Display results in table
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("#", style="dim", width=3)
+        table.add_column("Title", style="bold", max_width=40)
+        table.add_column("Authors", style="cyan", max_width=25)
+        table.add_column("Year", width=6)
+        table.add_column("arXiv ID", style="green", width=12)
+
+        for i, paper in enumerate(results, 1):
+            title = paper["title"]
+            if len(title) > 40:
+                title = title[:37] + "..."
+
+            authors = paper["authors"]
+            if len(authors) > 25:
+                authors = authors[:22] + "..."
+
+            year = paper["published"][:4] if paper.get("published") else "-"
+
+            table.add_row(
+                str(i),
+                title,
+                authors,
+                year,
+                paper["arxiv_id"]
+            )
+
+        console.print(table)
+
+        # Show how to add papers
+        console.print(f"\n[dim]To add a paper, use:[/dim]")
+        console.print(f"[dim]  uv run python -m src.cli add-paper <PDF_URL>[/dim]\n")
+
+    except Exception as e:
+        console.print(f"\n[bold red]✗ Error:[/bold red] {e}\n", style="red")
+        sys.exit(1)
 
 
 @cli.command()
