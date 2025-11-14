@@ -1,0 +1,127 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/  # uv's default virtual environment location
+
+# UV package manager
+# Note: uv.lock should be committed to version control
+.uv_cache/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# Ruff
+.ruff_cache/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data directories (contains user papers and databases)
+data/
+!data/.gitkeep
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# ChromaDB
+chroma/
+*.chroma
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Jupyter Notebooks (if used for experimentation)
+.ipynb_checkpoints
+*.ipynb
+
+# Alembic
+# Keep migrations folder but ignore __pycache__
+alembic/versions/__pycache__/
+
+# Test outputs
+test-results/
+test_*.db
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Package files
+*.tar.gz
+*.whl
+
+# User-specific files
+notes.txt
+TODO.txt
+scratch/
+experiments/
