@@ -384,9 +384,11 @@ Comprehensive test suites for:
 
 **Run tests:**
 ```bash
+# Run all tests
 uv run pytest
-# or
-make test
+
+# Run with coverage
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html tests/
 ```
 
 ---

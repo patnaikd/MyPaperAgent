@@ -98,16 +98,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
 # Sync dependencies (uv handles venv automatically)
 uv sync --all-extras
 
-# Or use make
-make setup
-
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your API keys (ANTHROPIC_API_KEY, VOYAGE_API_KEY, etc.)
 
 # Initialize database
 uv run python -m src.utils.database init
-# Or: make init-db
 ```
 
 ### Running the Application
@@ -119,67 +115,62 @@ uv run python -m src.cli summarize <paper_id>
 uv run python -m src.cli quiz <paper_id>
 uv run python -m src.cli search "transformer architecture"
 uv run python -m src.cli discover --topic "reinforcement learning"
+uv run python -m src.cli config  # Show current configuration
 
-# Or use make
-make run ARGS="add-paper path/to/paper.pdf"
-make config  # Show current configuration
+# Web UI (Streamlit)
+python run_ui.py
+# Or: uv run streamlit run src/ui/app.py
 ```
 
 ### Testing
 ```bash
 # Run all tests
 uv run pytest
-# Or: make test
 
 # Run specific test file
 uv run pytest tests/test_paper_manager.py
 
 # Run with coverage
-uv run pytest --cov=src tests/
-# Or: make test-cov
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html tests/
 
 # Run specific test
 uv run pytest tests/test_paper_manager.py::test_add_paper
 
 # Run fast tests only
 uv run pytest -m "not slow"
-# Or: make test-fast
 ```
 
 ### Linting and Formatting
 ```bash
 # Format code
 uv run black src/ tests/
-# Or: make format
+
+# Check formatting
+uv run black --check src/ tests/
 
 # Lint
 uv run ruff check src/ tests/
-# Or: make lint
 
 # Type checking
 uv run mypy src/
-# Or: make type-check
-
-# Run all checks
-make check-all
 ```
 
-### UV-Specific Commands
+### UV Commands
 ```bash
 # Update dependencies
 uv sync --all-extras
 
 # Update lock file
 uv lock
-# Or: make lock
 
 # Show dependency tree
 uv tree
-# Or: make uv-tree
 
 # Check for outdated dependencies
 uv pip list --outdated
-# Or: make uv-outdated
+
+# Upgrade uv itself
+pip install --upgrade uv
 ```
 
 ## Important Implementation Notes

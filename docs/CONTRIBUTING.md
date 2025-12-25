@@ -35,8 +35,6 @@ cd MyPaperAgent
 3. **Sync dependencies** (uv handles venv creation automatically)
 ```bash
 uv sync --all-extras
-# Or use make
-make dev-setup
 ```
 
 4. **Set up environment variables**
@@ -48,13 +46,11 @@ cp .env.example .env
 5. **Initialize the database**
 ```bash
 uv run python -m src.utils.database init
-# Or: make init-db
 ```
 
 6. **Run tests to verify setup**
 ```bash
 uv run pytest
-# Or: make test
 ```
 
 ## Development Workflow
@@ -82,24 +78,29 @@ git checkout -b feature/your-feature-name
 
 3. **Format and lint your code**
 ```bash
+# Format code
 uv run black src/ tests/
+
+# Check formatting
+uv run black --check src/ tests/
+
+# Lint code
 uv run ruff check src/ tests/
+
+# Type check
 uv run mypy src/
-# Or use make
-make format
-make lint
-make type-check
-# Or all at once
-make check-all
 ```
 
 4. **Run tests**
 ```bash
+# Run all tests
 uv run pytest
-uv run pytest --cov=src tests/  # With coverage
-# Or use make
-make test
-make test-cov
+
+# Run with coverage
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html tests/
+
+# Run fast tests only
+uv run pytest -m "not slow"
 ```
 
 5. **Commit your changes**
@@ -199,7 +200,6 @@ class TestPaperManager:
 ```bash
 # Run all tests
 uv run pytest
-# Or: make test
 
 # Run specific test file
 uv run pytest tests/test_paper_manager.py
@@ -208,12 +208,10 @@ uv run pytest tests/test_paper_manager.py
 uv run pytest tests/test_paper_manager.py::TestPaperManager::test_add_paper_from_pdf
 
 # Run with coverage
-uv run pytest --cov=src tests/
-# Or: make test-cov
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html tests/
 
 # Run only fast tests (skip slow integration tests)
 uv run pytest -m "not slow"
-# Or: make test-fast
 ```
 
 ## Documentation

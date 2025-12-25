@@ -26,6 +26,10 @@ MyPaperAgent helps researchers, students, and academics efficiently read, unders
 - **Context-aware Q&A**: Ask questions and get answers grounded in paper content
 - **Citation graph**: Visualize connections between papers
 
+### 🧭 Research Synthesis
+- **Paper story timeline**: Trace citations and citations-of-citations to build a human-readable research timeline
+- **Survey paper builder**: Generate structured survey drafts for a given research area
+
 ### ✍️ Dual Note-Taking System
 - **AI-generated notes**: Automatic extraction of key concepts
 - **Personal annotations**: Add your own insights and observations
@@ -98,6 +102,30 @@ uv run python -m src.utils.database init
 - **Windows**: Download from [GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
 
 ## Quick Start
+
+### Option 1: Web UI (Recommended)
+
+**Launch the Streamlit web interface:**
+
+```bash
+# Using the launch script (recommended)
+python run_ui.py
+
+# Or directly with uv run
+uv run streamlit run src/ui/app.py
+```
+
+The UI provides:
+- 📚 Visual paper library with filtering and search
+- ➕ Easy PDF upload and URL import
+- 📖 Interactive paper viewer with AI features (summarize, Q&A, quiz)
+- 🔍 Semantic search interface
+- 🌐 Paper discovery from arXiv
+- ⚙️ Settings and configuration viewer
+
+See [src/ui/README.md](src/ui/README.md) for detailed UI documentation.
+
+### Option 2: Command Line Interface
 
 ### Add a Paper
 
@@ -235,32 +263,38 @@ CHUNK_OVERLAP=100             # Overlap between chunks
 
 ## Development
 
-See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
+See [CLAUDE.md](CLAUDE.md) for detailed development guidelines and [COMMANDS.md](docs/COMMANDS.md) for a complete command reference.
 
 ### Running Tests
 
 ```bash
+# Run all tests
 uv run pytest
-# Or use make
-make test
+
+# Run with coverage
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html tests/
+
+# Run fast tests only (skip slow/integration tests)
+uv run pytest -m "not slow"
 ```
 
 ### Code Formatting
 
 ```bash
+# Format code
 uv run black src/ tests/
+
+# Check formatting
+uv run black --check src/ tests/
+
+# Lint code
 uv run ruff check src/ tests/
-# Or use make
-make format
-make lint
 ```
 
 ### Type Checking
 
 ```bash
 uv run mypy src/
-# Or use make
-make type-check
 ```
 
 ## API Keys
@@ -276,20 +310,28 @@ You'll need:
 ## Roadmap
 
 - [x] Project setup and architecture
-- [ ] Core paper management (add, list, delete)
-- [ ] PDF text extraction and metadata parsing
-- [ ] RAG system with ChromaDB
+- [x] Core paper management (add, list, delete)
+- [x] PDF text extraction and metadata parsing
+- [x] RAG system with ChromaDB
+- [x] Summarization agent (3 levels)
+- [x] Q&A agent with RAG
+- [x] Quiz generation and assessment
+- [x] Paper discovery (arXiv integration)
+- [x] Note-taking system
+- [x] Web UI (Streamlit)
+- [x] CLI interface
+- [ ] Literature review agent
 - [ ] Reading assistant agent
-- [ ] Summarization agent
-- [ ] Note-taking system
-- [ ] Quiz generation and assessment
-- [ ] Paper discovery and recommendations
-- [ ] Web UI (future)
+- [ ] Semantic Scholar integration
+- [ ] Paper comparison features
+- [ ] Collection management
+- [ ] Export functionality (markdown, PDF)
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
+Quick steps:
 1. Fork the repository
 2. Create a feature branch
 3. Write tests for new functionality
