@@ -50,69 +50,30 @@ MyPaperAgent helps researchers, students, and academics efficiently read, unders
 
 ## Installation
 
-### Prerequisites
-- Python 3.11 or higher
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
-- Tesseract OCR (for scanned PDFs)
-
 ### Setup
 
-1. **Install uv** (if not already installed)
-```bash
-# On macOS and Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# On Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or with pip
-pip install uv
-```
-
-2. **Clone the repository**
+1. **Clone the repository**
 ```bash
 git clone https://github.com/yourusername/MyPaperAgent.git
 cd MyPaperAgent
 ```
 
-3. **Sync dependencies** (uv handles venv creation automatically)
+2. **Run the bootstrap script (installs dependencies, initializes DB, and launches UI)**
 ```bash
-uv sync --all-extras
+./run_my_paper_agent.sh
 ```
 
-4. **Set up environment variables**
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your API keys:
-```
-ANTHROPIC_API_KEY=your_anthropic_key_here
-VOYAGE_API_KEY=your_voyage_key_here  # or OPENAI_API_KEY for embeddings
-```
-
-5. **Initialize the database**
-```bash
-uv run python -m src.utils.database init
-```
-
-6. **Install Tesseract (optional, for OCR)**
-- **macOS**: `brew install tesseract`
-- **Ubuntu**: `sudo apt-get install tesseract-ocr`
-- **Windows**: Download from [GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
+The script will install `uv` if needed, sync dependencies, create `.env` from
+`.env.example`, initialize the database, and start Streamlit.
 
 ## Quick Start
 
-### Option 1: Web UI (Recommended)
+### Web UI
 
 **Launch the Streamlit web interface:**
 
 ```bash
-# Using the launch script (recommended)
-python run_ui.py
-
-# Or directly with uv run
-uv run streamlit run src/ui/app.py
+./run_my_paper_agent.sh
 ```
 
 The UI provides:
@@ -124,56 +85,6 @@ The UI provides:
 - ⚙️ Settings and configuration viewer
 
 See [src/ui/README.md](src/ui/README.md) for detailed UI documentation.
-
-### Option 2: Command Line Interface
-
-### Add a Paper
-
-**From PDF:**
-```bash
-uv run python -m src.cli add-paper path/to/paper.pdf
-```
-
-**From URL:**
-```bash
-uv run python -m src.cli add-paper https://arxiv.org/abs/2301.00001
-```
-
-### Summarize a Paper
-
-```bash
-uv run python -m src.cli summarize <paper_id>
-```
-
-### Search Your Library
-
-```bash
-uv run python -m src.cli search "transformer architecture"
-```
-
-### Take a Quiz
-
-```bash
-uv run python -m src.cli quiz <paper_id>
-```
-
-### Add Personal Notes
-
-```bash
-uv run python -m src.cli note <paper_id> "My observation about the methodology..."
-```
-
-### Discover Related Papers
-
-```bash
-uv run python -m src.cli discover --topic "reinforcement learning" --limit 10
-```
-
-### List All Papers
-
-```bash
-uv run python -m src.cli list
-```
 
 ## Usage Examples
 
