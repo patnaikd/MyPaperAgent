@@ -74,7 +74,7 @@ with st.sidebar:
         st.metric("Total Papers", "N/A")
 
     st.markdown("---")
-    st.caption("Built with Claude Agent SDK")
+    st.caption("© 2026 MyPaperAgent - Debprakash Patnaik")
 
 # Main content area
 def main():

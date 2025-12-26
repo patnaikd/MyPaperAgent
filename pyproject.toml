@@ -45,6 +45,7 @@ dependencies = [
     "tenacity>=8.2.0",
     "streamlit>=1.39.0",
     "plotly>=5.18.0",
+    "watchdog>=4.0.0",
 ]
 
 [project.optional-dependencies]
