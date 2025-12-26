@@ -1,5 +1,10 @@
 """Shared UI helpers for Streamlit pages."""
+import logging
+
 import streamlit as st
+
+
+logger = logging.getLogger(__name__)
 
 
 def render_footer() -> None:

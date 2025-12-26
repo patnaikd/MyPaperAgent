@@ -1,9 +1,14 @@
 """Search page - semantic search across papers."""
+import logging
+
 import streamlit as st
 
 from src.rag.retriever import RAGRetriever
 from src.core.paper_manager import PaperManager
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_search_page():

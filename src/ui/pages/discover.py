@@ -1,10 +1,15 @@
 """Discover page - find papers on arXiv."""
+import logging
+
 import streamlit as st
 
 from src.discovery.arxiv_search import ArxivSearch
 from src.core.paper_manager import PaperManager
 from src.rag.retriever import RAGRetriever
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_discover_page():

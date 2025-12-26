@@ -1,8 +1,13 @@
 """Settings page - view and manage configuration."""
+import logging
+
 import streamlit as st
 
 from src.utils.config import get_config
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_settings_page():

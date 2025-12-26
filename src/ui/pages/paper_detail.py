@@ -1,4 +1,5 @@
 """Paper detail page - view paper with AI features."""
+import logging
 from pathlib import Path
 
 import streamlit as st
@@ -11,6 +12,9 @@ from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.utils.database import NoteType
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_paper_detail_page():

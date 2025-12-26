@@ -1,4 +1,6 @@
 """Add paper page - upload PDFs or add from URL."""
+import logging
+
 import streamlit as st
 import tempfile
 from pathlib import Path
@@ -6,6 +8,9 @@ from pathlib import Path
 from src.core.paper_manager import PaperManager
 from src.rag.retriever import RAGRetriever
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_add_paper_page():

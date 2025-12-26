@@ -1,10 +1,15 @@
 """Library page - view and manage papers."""
+import logging
+
 import streamlit as st
 from datetime import datetime
 
 from src.core.paper_manager import PaperManager
 from src.utils.database import ReadingStatus
 from src.ui.ui_helpers import render_footer
+
+
+logger = logging.getLogger(__name__)
 
 
 def show_library_page():

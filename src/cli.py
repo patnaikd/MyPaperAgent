@@ -1,4 +1,5 @@
 """Command-line interface for MyPaperAgent."""
+import logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,9 @@ from src.core.paper_manager import PaperManager, PaperManagerError, PaperNotFoun
 from src.discovery.arxiv_search import ArxivSearch
 from src.rag.retriever import RAGRetriever, index_all_papers
 from src.utils.config import get_config
+
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 

@@ -1,4 +1,5 @@
 """Database models and initialization for MyPaperAgent."""
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -18,6 +19,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 from src.utils.config import get_config
+
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 

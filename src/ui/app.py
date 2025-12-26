@@ -1,6 +1,60 @@
 """Main Streamlit application for MyPaperAgent."""
-import streamlit as st
+import logging
+from datetime import datetime
 from pathlib import Path
+
+import streamlit as st
+
+from src.utils.config import get_config
+
+
+config = get_config()
+config.ensure_directories()
+
+_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(filename)s:%(lineno)d %(message)s"
+_LOG_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+_LOG_FILE = config.log_file.parent / f"mypaperagent_{_LOG_TIMESTAMP}.log"
+
+root_logger = logging.getLogger()
+log_level = getattr(logging, config.log_level.upper(), logging.INFO)
+logging_configured = False
+
+if not root_logger.handlers:
+    logging.basicConfig(
+        level=log_level,
+        format=_LOG_FORMAT,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(_LOG_FILE),
+        ],
+    )
+    logging_configured = True
+else:
+    root_logger.setLevel(log_level)
+    has_console = any(
+        isinstance(handler, logging.StreamHandler)
+        and not isinstance(handler, logging.FileHandler)
+        for handler in root_logger.handlers
+    )
+    if not has_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+        root_logger.addHandler(console_handler)
+        logging_configured = True
+    has_log_file = any(
+        isinstance(handler, logging.FileHandler)
+        and getattr(handler, "baseFilename", None) == str(_LOG_FILE)
+        for handler in root_logger.handlers
+    )
+    if not has_log_file:
+        file_handler = logging.FileHandler(_LOG_FILE)
+        file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+        root_logger.addHandler(file_handler)
+        logging_configured = True
+
+logger = logging.getLogger(__name__)
+if logging_configured:
+    logger.info("Logging configured: level=%s file=%s", config.log_level.upper(), _LOG_FILE)
 
 # Configure page
 st.set_page_config(
@@ -169,6 +223,9 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = "Library"
 if "selected_paper_id" not in st.session_state:
     st.session_state.selected_paper_id = None
+if "session_started" not in st.session_state:
+    st.session_state.session_started = True
+    logger.info("Streamlit UI session started")
 
 # Sidebar navigation
 with st.sidebar:
@@ -182,7 +239,9 @@ with st.sidebar:
 
     for icon, (label, page_id) in pages.items():
         if st.button(icon, key=f"nav_{page_id}", help=label):
+            previous_page = st.session_state.current_page
             st.session_state.current_page = page_id
+            logger.info("Navigation: %s -> %s", previous_page, page_id)
             st.rerun()
 
 # Main content area
@@ -210,6 +269,7 @@ def main():
         show_paper_detail_page()
     else:
         # Default to library
+        logger.warning("Unknown page '%s', defaulting to library", current_page)
         from src.ui.pages.library import show_library_page
         show_library_page()
 
