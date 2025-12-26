@@ -25,6 +25,12 @@ st.markdown("""
         --border: #d8dde3;
     }
 
+    /* Remove blank space at top and bottom */ 
+    .block-container {
+        padding-top: 2.2rem;
+        padding-bottom: 0rem;
+    }
+
     html, body, [class*="css"]  {
         font-family: 'Source Sans 3', sans-serif;
         color: var(--ink);
@@ -35,6 +41,14 @@ st.markdown("""
     .stApp {
         background-color: var(--surface);
     }
+            
+    .stAppToolbar {
+        # background-image: url('https://picsum.photos/1024/64');
+        background-image: url('https://fastly.picsum.photos/id/560/1024/64.jpg?hmac=ZWRIwsI-S1oDpkzWzcUmgKWyHp-nhIGRaYp518iH3Yk');
+        background-repeat: repeat;
+        background-size: contain;
+        background-position: left center;
+    }
 
     .main {
         padding: 0.5rem 1.2rem;
@@ -43,16 +57,6 @@ st.markdown("""
     [data-testid="stAppHeader"] {
         background-color: var(--surface);
         border-bottom: 1px solid var(--border);
-    }
-
-    [data-testid="stAppHeader"]::before {
-        content: "MyPaperAgent";
-        font-family: 'Source Serif 4', serif;
-        font-weight: 600;
-        font-size: 1.05rem;
-        color: var(--ink);
-        padding-left: 1rem;
-        line-height: 2.6rem;
     }
 
     h1, h2, h3, h4, h5 {
