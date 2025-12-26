@@ -1,6 +1,6 @@
 """Quiz generation agent for academic papers."""
 import logging
-from typing import Literal
+from typing import Literal, Optional
 
 from src.agents.base import BaseAgent
 from src.core.paper_manager import PaperManager

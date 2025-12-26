@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -217,6 +218,7 @@ def get_engine():
         config = get_config()
         database_url = f"sqlite:///{config.database_path}"
         _engine = create_engine(database_url, echo=config.debug)
+        ensure_database_initialized(_engine)
     return _engine
 
 
@@ -234,6 +236,13 @@ def init_database() -> None:
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
     print("Database initialized successfully!")
+
+
+def ensure_database_initialized(engine) -> None:
+    """Create tables if the database is uninitialized."""
+    inspector = inspect(engine)
+    if not inspector.has_table("papers"):
+        Base.metadata.create_all(bind=engine)
 
 
 def drop_all_tables() -> None:

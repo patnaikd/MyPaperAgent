@@ -92,6 +92,10 @@ class VectorStore:
         try:
             logger.info(f"Adding {len(texts)} documents to vector store")
 
+            sanitized_metadata = [
+                self._sanitize_metadata(entry) for entry in metadata
+            ]
+
             # Generate IDs if not provided
             if ids is None:
                 # Use collection count as base for IDs
@@ -103,7 +107,10 @@ class VectorStore:
 
             # Add to collection
             self.collection.add(
-                documents=texts, embeddings=embeddings, metadatas=metadata, ids=ids
+                documents=texts,
+                embeddings=embeddings,
+                metadatas=sanitized_metadata,
+                ids=ids,
             )
 
             logger.info(f"Successfully added {len(texts)} documents")
@@ -112,6 +119,18 @@ class VectorStore:
         except Exception as e:
             logger.error(f"Failed to add documents: {e}")
             raise VectorStoreError(f"Failed to add documents: {str(e)}") from e
+
+    def _sanitize_metadata(self, metadata: dict) -> dict:
+        """Ensure metadata values are compatible with ChromaDB."""
+        sanitized = {}
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            if isinstance(value, (bool, int, float, str)):
+                sanitized[key] = value
+            else:
+                sanitized[key] = str(value)
+        return sanitized
 
     def add_paper_chunks(
         self, paper_id: int, chunks: list[dict[str, any]]
