@@ -1,4 +1,9 @@
-"""Note management system for papers."""
+"""Note management system for papers.
+
+This module provides a small service layer around the Note model, responsible
+for creating, reading, updating, and deleting paper notes. It also supports
+merging AI-generated and personal notes into a single Markdown-friendly view.
+"""
 import logging
 from typing import Optional
 

@@ -1,4 +1,9 @@
-"""Paper management system for CRUD operations."""
+"""Paper management system for CRUD operations.
+
+This module orchestrates paper ingestion, storage, and retrieval. It ties
+together PDF extraction, metadata parsing, and persistent storage so callers
+can add papers from local files or URLs and manage their library state.
+"""
 import logging
 import shutil
 from datetime import datetime
