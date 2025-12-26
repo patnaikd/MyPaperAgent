@@ -7,6 +7,7 @@ from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.utils.database import NoteType
+from src.ui.ui_helpers import render_footer
 
 
 def show_paper_detail_page():
@@ -18,6 +19,7 @@ def show_paper_detail_page():
         if st.button("🏠 Go to Library"):
             st.session_state.current_page = "library"
             st.rerun()
+        render_footer()
         return
 
     try:
@@ -25,6 +27,7 @@ def show_paper_detail_page():
         paper = manager.get_paper(paper_id)
     except Exception as e:
         st.error(f"Failed to load paper: {e}")
+        render_footer()
         return
 
     # Header
@@ -79,6 +82,8 @@ def show_paper_detail_page():
 
     with tab4:
         show_notes_tab(paper_id)
+
+    render_footer()
 
 
 def show_summarize_tab(paper_id: int):

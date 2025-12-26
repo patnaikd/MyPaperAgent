@@ -4,6 +4,7 @@ from datetime import datetime
 
 from src.core.paper_manager import PaperManager
 from src.utils.database import ReadingStatus
+from src.ui.ui_helpers import render_footer
 
 
 def show_library_page():
@@ -15,6 +16,7 @@ def show_library_page():
         manager = PaperManager()
     except Exception as e:
         st.error(f"Failed to initialize Paper Manager: {e}")
+        render_footer()
         return
 
     # Filters
@@ -34,6 +36,21 @@ def show_library_page():
         limit = st.number_input("Show", min_value=10, max_value=200, value=50, step=10)
 
     st.markdown("---")
+
+    # Quick stats
+    try:
+        total_papers = manager.get_paper_count()
+        papers_for_stats = manager.list_papers(limit=1000)
+        completed = sum(1 for p in papers_for_stats if p.status == ReadingStatus.COMPLETED.value)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Papers", total_papers)
+        with col2:
+            st.metric("Completed", completed)
+        st.markdown("---")
+    except Exception:
+        st.metric("Total Papers", "N/A")
+        st.markdown("---")
 
     # Get papers
     try:
@@ -64,6 +81,7 @@ def show_library_page():
             if st.button("➕ Go to Add Paper"):
                 st.session_state.current_page = "add_paper"
                 st.rerun()
+            render_footer()
             return
 
         # Display count
@@ -135,3 +153,5 @@ def show_library_page():
     except Exception as e:
         st.error(f"Error loading papers: {e}")
         st.exception(e)
+
+    render_footer()

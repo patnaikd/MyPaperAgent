@@ -4,6 +4,7 @@ import streamlit as st
 from src.discovery.arxiv_search import ArxivSearch
 from src.core.paper_manager import PaperManager
 from src.rag.retriever import RAGRetriever
+from src.ui.ui_helpers import render_footer
 
 
 def show_discover_page():
@@ -25,6 +26,8 @@ def show_discover_page():
 
     with tab3:
         show_recent_papers()
+
+    render_footer()
 
 
 def show_topic_search():

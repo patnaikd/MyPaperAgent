@@ -2,6 +2,7 @@
 import streamlit as st
 
 from src.utils.config import get_config
+from src.ui.ui_helpers import render_footer
 
 
 def show_settings_page():
@@ -166,3 +167,5 @@ def show_settings_page():
 
         if st.button("🔄 Reset Vector Database", type="secondary"):
             st.error("This feature is disabled for safety. Delete the vector_db directory manually if needed.")
+
+    render_footer()

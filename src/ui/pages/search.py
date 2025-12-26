@@ -3,6 +3,7 @@ import streamlit as st
 
 from src.rag.retriever import RAGRetriever
 from src.core.paper_manager import PaperManager
+from src.ui.ui_helpers import render_footer
 
 
 def show_search_page():
@@ -162,3 +163,5 @@ def show_search_page():
 
     except Exception as e:
         st.warning(f"Could not load statistics: {e}")
+
+    render_footer()

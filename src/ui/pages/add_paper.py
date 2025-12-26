@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.core.paper_manager import PaperManager
 from src.rag.retriever import RAGRetriever
+from src.ui.ui_helpers import render_footer
 
 
 def show_add_paper_page():
@@ -24,6 +25,8 @@ def show_add_paper_page():
 
     with tab2:
         show_url_section()
+
+    render_footer()
 
 
 def show_upload_section():
