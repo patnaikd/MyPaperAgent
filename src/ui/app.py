@@ -44,7 +44,8 @@ st.markdown("""
             
     .stAppToolbar {
         # background-image: url('https://picsum.photos/1024/64');
-        background-image: url('https://fastly.picsum.photos/id/560/1024/64.jpg?hmac=ZWRIwsI-S1oDpkzWzcUmgKWyHp-nhIGRaYp518iH3Yk');
+        # background-image: url('https://fastly.picsum.photos/id/560/1024/64.jpg?hmac=ZWRIwsI-S1oDpkzWzcUmgKWyHp-nhIGRaYp518iH3Yk');
+        background-image: url('/app/static/header.jpg');
         background-repeat: repeat;
         background-size: contain;
         background-position: left center;
