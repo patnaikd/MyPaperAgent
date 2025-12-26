@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from src.rag.chunker import TextChunker
 from src.rag.embeddings import EmbeddingGenerator
 from src.rag.vector_store import VectorStore
-from src.utils.database import Paper, get_session
+from src.utils.database import Paper, ReadingStatus, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +100,23 @@ class RAGRetriever:
         if paper_id:
             results = self.vector_store.search_by_paper(query, paper_id, n_results)
         else:
-            results = self.vector_store.search(query, n_results)
+            archived_ids = {
+                paper_id
+                for (paper_id,) in self.session.query(Paper.id)
+                .filter(Paper.status == ReadingStatus.ARCHIVED.value)
+                .all()
+            }
+            fetch_count = n_results
+            if archived_ids:
+                fetch_count = min(max(n_results * 3, n_results), 100)
+
+            results = self.vector_store.search(query, fetch_count)
 
         # Format results
         formatted_results = []
         for i in range(len(results["ids"])):
+            if paper_id is None and results["metadatas"][i].get("paper_id") in archived_ids:
+                continue
             formatted_results.append(
                 {
                     "id": results["ids"][i],
@@ -115,7 +127,7 @@ class RAGRetriever:
                 }
             )
 
-        return formatted_results
+        return formatted_results[:n_results]
 
     def get_context_for_query(
         self,

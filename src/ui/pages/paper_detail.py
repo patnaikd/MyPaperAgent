@@ -1,5 +1,8 @@
 """Paper detail page - view paper with AI features."""
+from pathlib import Path
+
 import streamlit as st
+from streamlit_pdf_viewer import pdf_viewer
 
 from src.agents.qa_agent import QAAgent
 from src.agents.quiz_generator import QuizGenerator
@@ -69,18 +72,23 @@ def show_paper_detail_page():
     st.markdown("---")
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4 = st.tabs(["💭 Summarize", "❓ Ask Questions", "📝 Quiz", "📔 Notes"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["💭 Summarize", "📄 View PDF", "❓ Ask Questions", "📝 Quiz", "📔 Notes"]
+    )
 
     with tab1:
         show_summarize_tab(paper_id)
 
     with tab2:
-        show_qa_tab(paper_id)
+        show_pdf_tab(paper)
 
     with tab3:
-        show_quiz_tab(paper_id)
+        show_qa_tab(paper_id)
 
     with tab4:
+        show_quiz_tab(paper_id)
+
+    with tab5:
         show_notes_tab(paper_id)
 
     render_footer()
@@ -150,6 +158,36 @@ def show_summarize_tab(paper_id: int):
 
     except Exception as e:
         st.warning(f"Could not load previous summaries: {e}")
+
+
+def show_pdf_tab(paper) -> None:
+    """Show PDF viewer for the selected paper."""
+    st.markdown("### 📄 View PDF")
+
+    if not paper.file_path:
+        st.info("No local PDF available for this paper.")
+        return
+
+    pdf_path = Path(paper.file_path)
+    if not pdf_path.exists():
+        st.warning(f"PDF file not found at {pdf_path}")
+        return
+
+    try:
+        pdf_bytes = pdf_path.read_bytes()
+    except Exception as e:
+        st.error(f"Failed to load PDF: {e}")
+        return
+
+    st.download_button(
+        "Download PDF",
+        data=pdf_bytes,
+        file_name=pdf_path.name,
+        mime="application/pdf",
+        use_container_width=True,
+    )
+
+    pdf_viewer(pdf_bytes, height=800)
 
 
 def show_qa_tab(paper_id: int):

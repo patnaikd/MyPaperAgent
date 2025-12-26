@@ -11,6 +11,8 @@ port = 8501
 enableCORS = true
 enableXsrfProtection = true
 enableStaticServing = true
+runOnSave = true
+fileWatcherType = "polling"
 
 [browser]
 gatherUsageStats = false

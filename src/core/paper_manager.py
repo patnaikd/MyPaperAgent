@@ -245,6 +245,10 @@ class PaperManager:
         self.session.commit()
         logger.info(f"Updated paper {paper_id} status to {status}")
 
+    def update_paper(self, paper_id: int, status: str) -> None:
+        """Backward-compatible wrapper for updating paper status."""
+        self.update_paper_status(paper_id, status)
+
     def delete_paper(self, paper_id: int, delete_file: bool = True) -> None:
         """Delete a paper from the library.
 

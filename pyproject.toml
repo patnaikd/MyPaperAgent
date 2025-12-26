@@ -46,6 +46,7 @@ dependencies = [
     "streamlit>=1.39.0",
     "plotly>=5.18.0",
     "watchdog>=4.0.0",
+    "streamlit-pdf-viewer>=0.0.16",
 ]
 
 [project.optional-dependencies]

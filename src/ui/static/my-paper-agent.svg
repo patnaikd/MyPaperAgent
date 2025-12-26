@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="64" viewBox="0 0 1024 64">
+  <rect width="1024" height="64" fill="#000000" />
+  <text
+    x="32"
+    y="40"
+    text-anchor="start"
+    font-family="Courier New, Courier, monospace"
+    font-size="36"
+    fill="#0b6b2f"
+  >
+    My Paper Agent
+  </text>
+</svg>

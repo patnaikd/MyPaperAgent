@@ -27,7 +27,7 @@ st.markdown("""
 
     /* Remove blank space at top and bottom */ 
     .block-container {
-        padding-top: 2.2rem;
+        padding-top: 2.5rem;
         padding-bottom: 0rem;
     }
 
@@ -45,10 +45,13 @@ st.markdown("""
     .stAppToolbar {
         # background-image: url('https://picsum.photos/1024/64');
         # background-image: url('https://fastly.picsum.photos/id/560/1024/64.jpg?hmac=ZWRIwsI-S1oDpkzWzcUmgKWyHp-nhIGRaYp518iH3Yk');
-        background-image: url('/app/static/header.jpg');
-        background-repeat: repeat;
+        # background-image: url('/app/static/header.jpg');
+        background-image: url('/app/static/my-paper-agent.png');
+        background-repeat: no-repeat;
         background-size: contain;
         background-position: left center;
+        background-color: black;
+        color: gray;
     }
 
     .main {

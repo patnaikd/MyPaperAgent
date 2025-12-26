@@ -1700,6 +1700,7 @@ dependencies = [
     { name = "rich" },
     { name = "sqlalchemy" },
     { name = "streamlit" },
+    { name = "streamlit-pdf-viewer" },
     { name = "tenacity" },
     { name = "tiktoken" },
     { name = "voyageai" },
@@ -1745,6 +1746,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "streamlit", specifier = ">=1.39.0" },
+    { name = "streamlit-pdf-viewer", specifier = ">=0.0.16" },
     { name = "tenacity", specifier = ">=8.2.0" },
     { name = "tiktoken", specifier = ">=0.5.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -3390,6 +3392,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/59/6d/327ddd5fc35fcf2aeecb4040668337f5565a1c6c95b1e892b8bfd4bb9031/streamlit-1.51.0.tar.gz", hash = "sha256:1e742a9c0b698f466c6f5bf58d333beda5a1fbe8de660743976791b5c1446ef6", size = 9742904, upload-time = "2025-10-29T17:07:39.082Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/39/60/868371b6482ccd9ef423c6f62650066cf8271fdb2ee84f192695ad6b7a96/streamlit-1.51.0-py3-none-any.whl", hash = "sha256:4008b029f71401ce54946bb09a6a3e36f4f7652cbb48db701224557738cfda38", size = 10171702, upload-time = "2025-10-29T17:07:35.97Z" },
+]
+
+[[package]]
+name = "streamlit-pdf-viewer"
+version = "0.0.26"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/86/19070a89e0140ec3744908cfee660d9f5a0498f7eeaeb916006222f64598/streamlit_pdf_viewer-0.0.26.tar.gz", hash = "sha256:360560b04b01f4805dccbece16e649077e2983a753102c4c95338d8c5234a7d2", size = 2556416, upload-time = "2025-06-23T20:53:49.039Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/c6/f9309b16cd987c61f3144489fdae57d6692f24e272880b65d57600e6ae36/streamlit_pdf_viewer-0.0.26-py3-none-any.whl", hash = "sha256:d6fcc9b1bb0d79e07d3c3506b5467bf79b9c3aada15ffa052e9bf3b913df33aa", size = 2598801, upload-time = "2025-06-23T20:53:47.562Z" },
 ]
 
 [[package]]

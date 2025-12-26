@@ -20,20 +20,39 @@ def show_library_page():
         return
 
     # Filters
-    col1, col2, col3 = st.columns([2, 2, 1])
+    col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
 
     with col1:
+        status_options = ["All", "Unread", "Reading", "Completed"]
+        if (
+            "library_status_filter" in st.session_state
+            and st.session_state["library_status_filter"] not in status_options
+        ):
+            st.session_state["library_status_filter"] = "All"
+
         status_filter = st.selectbox(
             "Filter by status",
-            ["All", "Unread", "Reading", "Completed", "Archived"],
-            key="library_status_filter"
+            status_options,
+            key="library_status_filter",
         )
+
+        include_archived = st.checkbox(
+            "Include archived",
+            value=False,
+            key="library_include_archived",
+        )
+
+        if include_archived:
+            status_options.append("Archived")
 
     with col2:
         search_query = st.text_input("Search papers", placeholder="Search by title or author...")
 
     with col3:
         limit = st.number_input("Show", min_value=10, max_value=200, value=50, step=10)
+
+    with col4:
+        st.empty()
 
     st.markdown("---")
 
@@ -62,10 +81,10 @@ def show_library_page():
             "Archived": ReadingStatus.ARCHIVED.value,
         }
 
-        papers = manager.list_papers(
-            status=status_map[status_filter],
-            limit=limit
-        )
+        papers = manager.list_papers(status=status_map[status_filter], limit=limit)
+
+        if not include_archived and status_filter == "All":
+            papers = [paper for paper in papers if paper.status != ReadingStatus.ARCHIVED.value]
 
         # Apply search filter if provided
         if search_query:

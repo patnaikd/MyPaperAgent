@@ -118,6 +118,15 @@ class NoteManager:
 
         return query.order_by(Note.created_at.desc()).all()
 
+    def get_notes(
+        self,
+        paper_id: int,
+        note_type: Optional[str] = None,
+        section: Optional[str] = None,
+    ) -> list[Note]:
+        """Backward-compatible wrapper for fetching paper notes."""
+        return self.get_paper_notes(paper_id, note_type=note_type, section=section)
+
     def update_note(self, note_id: int, content: str) -> None:
         """Update a note's content.
 
