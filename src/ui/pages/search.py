@@ -62,7 +62,7 @@ def show_search_page():
             return
 
     # Search button
-    if st.button("🔍 Search", type="primary", disabled=not query, use_container_width=True):
+    if st.button("🔍 Search", type="primary", disabled=not query, width="stretch"):
         with st.spinner("Searching..."):
             try:
                 retriever = RAGRetriever()

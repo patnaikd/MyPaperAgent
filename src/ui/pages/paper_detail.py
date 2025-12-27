@@ -118,7 +118,7 @@ def show_summarize_tab(paper_id: int):
     with col2:
         save_as_note = st.checkbox("Save as note", value=True)
 
-    if st.button("✨ Generate Summary", type="primary", use_container_width=True):
+    if st.button("✨ Generate Summary", type="primary", width="stretch"):
         with st.spinner(f"Generating {summary_level} summary with Claude..."):
             try:
                 agent = SummarizationAgent()
@@ -188,7 +188,7 @@ def show_pdf_tab(paper) -> None:
         data=pdf_bytes,
         file_name=pdf_path.name,
         mime="application/pdf",
-        use_container_width=True,
+        width="stretch",
     )
 
     pdf_viewer(pdf_bytes, height=800)
@@ -205,7 +205,7 @@ def show_qa_tab(paper_id: int):
         height=100
     )
 
-    if st.button("🔍 Get Answer", type="primary", disabled=not question, use_container_width=True):
+    if st.button("🔍 Get Answer", type="primary", disabled=not question, width="stretch"):
         with st.spinner("Generating answer with Claude..."):
             try:
                 agent = QAAgent()
@@ -263,7 +263,7 @@ def show_quiz_tab(paper_id: int):
             index=3
         )
 
-    if st.button("✨ Generate Quiz", type="primary", use_container_width=True):
+    if st.button("✨ Generate Quiz", type="primary", width="stretch"):
         with st.spinner(f"Generating {num_questions} questions with Claude..."):
             try:
                 generator = QuizGenerator()
@@ -336,7 +336,7 @@ def show_notes_tab(paper_id: int):
             placeholder="e.g., Methodology, Results, Ideas"
         )
 
-        if st.button("💾 Save Note", disabled=not note_content, use_container_width=True):
+        if st.button("💾 Save Note", disabled=not note_content, width="stretch"):
             try:
                 note_manager = NoteManager()
                 note_id = note_manager.add_note(

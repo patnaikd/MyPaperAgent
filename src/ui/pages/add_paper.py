@@ -34,6 +34,36 @@ def show_add_paper_page():
     render_footer()
 
 
+def _render_added_paper_summary(paper_id: int, source: str) -> None:
+    """Render summary/actions for the last added paper."""
+    manager = PaperManager()
+    paper = manager.get_paper(paper_id)
+
+    st.success("✅ Paper added successfully!")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Paper ID", paper_id)
+        st.write(f"**Title:** {paper.title or 'Unknown'}")
+        st.write(f"**Authors:** {paper.authors or 'Unknown'}")
+    with col2:
+        st.metric("Pages", paper.page_count or "N/A")
+        st.write(f"**Year:** {paper.year or 'Unknown'}")
+
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📖 View Paper", width="stretch", key=f"view_{source}_{paper_id}"):
+            st.session_state.selected_paper_id = paper_id
+            st.session_state.current_page = "paper_detail"
+            st.rerun()
+    with col2:
+        if st.button("➕ Add Another", width="stretch", key=f"add_another_{source}"):
+            st.session_state.pop("last_added_paper_id", None)
+            st.session_state.pop("last_added_source", None)
+            st.rerun()
+
+
 def show_upload_section():
     """Show PDF upload section."""
     st.markdown("### Upload PDF File")
@@ -57,7 +87,7 @@ def show_upload_section():
     if uploaded_file is not None:
         st.info(f"**File:** {uploaded_file.name} ({uploaded_file.size / 1024:.1f} KB)")
 
-        if st.button("✅ Add Paper", type="primary", use_container_width=True):
+        if st.button("✅ Add Paper", type="primary", width="stretch"):
             with st.spinner("Processing PDF..."):
                 try:
                     # Save uploaded file to temporary location
@@ -76,24 +106,8 @@ def show_upload_section():
                         collection_name=collection if collection else None
                     )
 
-                    # Get paper details
-                    paper = manager.get_paper(paper_id)
-
                     # Clean up temp file
                     tmp_path.unlink()
-
-                    # Success message
-                    st.success("✅ Paper added successfully!")
-
-                    # Display paper info
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Paper ID", paper_id)
-                        st.write(f"**Title:** {paper.title or 'Unknown'}")
-                        st.write(f"**Authors:** {paper.authors or 'Unknown'}")
-                    with col2:
-                        st.metric("Pages", paper.page_count or "N/A")
-                        st.write(f"**Year:** {paper.year or 'Unknown'}")
 
                     # Index for search
                     if not skip_index:
@@ -105,21 +119,21 @@ def show_upload_section():
                             except Exception as e:
                                 st.warning(f"⚠️ Failed to index paper: {e}")
 
-                    # Actions
-                    st.markdown("---")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("📖 View Paper", use_container_width=True):
-                            st.session_state.selected_paper_id = paper_id
-                            st.session_state.current_page = "paper_detail"
-                            st.rerun()
-                    with col2:
-                        if st.button("➕ Add Another", use_container_width=True):
-                            st.rerun()
+                    st.session_state.last_added_paper_id = paper_id
+                    st.session_state.last_added_source = "upload"
 
                 except Exception as e:
                     st.error(f"❌ Error adding paper: {e}")
                     st.exception(e)
+
+    if (
+        st.session_state.get("last_added_paper_id")
+        and st.session_state.get("last_added_source") == "upload"
+    ):
+        _render_added_paper_summary(
+            st.session_state["last_added_paper_id"],
+            "upload",
+        )
 
 
 def show_url_section():
@@ -144,7 +158,7 @@ def show_url_section():
         skip_index = st.checkbox("Skip automatic indexing", value=False, key="url_skip_index")
 
     if url:
-        if st.button("✅ Add Paper from URL", type="primary", use_container_width=True):
+        if st.button("✅ Add Paper from URL", type="primary", width="stretch"):
             with st.spinner("Downloading and processing paper..."):
                 try:
                     # Process tags
@@ -158,22 +172,6 @@ def show_url_section():
                         collection_name=collection if collection else None
                     )
 
-                    # Get paper details
-                    paper = manager.get_paper(paper_id)
-
-                    # Success message
-                    st.success("✅ Paper added successfully!")
-
-                    # Display paper info
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Paper ID", paper_id)
-                        st.write(f"**Title:** {paper.title or 'Unknown'}")
-                        st.write(f"**Authors:** {paper.authors or 'Unknown'}")
-                    with col2:
-                        st.metric("Pages", paper.page_count or "N/A")
-                        st.write(f"**Year:** {paper.year or 'Unknown'}")
-
                     # Index for search
                     if not skip_index:
                         with st.spinner("Indexing for semantic search..."):
@@ -184,18 +182,18 @@ def show_url_section():
                             except Exception as e:
                                 st.warning(f"⚠️ Failed to index paper: {e}")
 
-                    # Actions
-                    st.markdown("---")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("📖 View Paper", use_container_width=True, key="view_url"):
-                            st.session_state.selected_paper_id = paper_id
-                            st.session_state.current_page = "paper_detail"
-                            st.rerun()
-                    with col2:
-                        if st.button("➕ Add Another", use_container_width=True, key="add_url"):
-                            st.rerun()
+                    st.session_state.last_added_paper_id = paper_id
+                    st.session_state.last_added_source = "url"
 
                 except Exception as e:
                     st.error(f"❌ Error adding paper: {e}")
                     st.exception(e)
+
+    if (
+        st.session_state.get("last_added_paper_id")
+        and st.session_state.get("last_added_source") == "url"
+    ):
+        _render_added_paper_summary(
+            st.session_state["last_added_paper_id"],
+            "url",
+        )

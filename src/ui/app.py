@@ -11,51 +11,6 @@ from src.utils.config import get_config
 config = get_config()
 config.ensure_directories()
 
-_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(filename)s:%(lineno)d %(message)s"
-_LOG_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
-_LOG_FILE = config.log_file.parent / f"mypaperagent_{_LOG_TIMESTAMP}.log"
-
-root_logger = logging.getLogger()
-log_level = getattr(logging, config.log_level.upper(), logging.INFO)
-logging_configured = False
-
-if not root_logger.handlers:
-    logging.basicConfig(
-        level=log_level,
-        format=_LOG_FORMAT,
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(_LOG_FILE),
-        ],
-    )
-    logging_configured = True
-else:
-    root_logger.setLevel(log_level)
-    has_console = any(
-        isinstance(handler, logging.StreamHandler)
-        and not isinstance(handler, logging.FileHandler)
-        for handler in root_logger.handlers
-    )
-    if not has_console:
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
-        root_logger.addHandler(console_handler)
-        logging_configured = True
-    has_log_file = any(
-        isinstance(handler, logging.FileHandler)
-        and getattr(handler, "baseFilename", None) == str(_LOG_FILE)
-        for handler in root_logger.handlers
-    )
-    if not has_log_file:
-        file_handler = logging.FileHandler(_LOG_FILE)
-        file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
-        root_logger.addHandler(file_handler)
-        logging_configured = True
-
-logger = logging.getLogger(__name__)
-if logging_configured:
-    logger.info("Logging configured: level=%s file=%s", config.log_level.upper(), _LOG_FILE)
-
 # Configure page
 st.set_page_config(
     page_title="MyPaperAgent",
@@ -63,6 +18,74 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(filename)s:%(lineno)d %(message)s"
+_LOG_RETENTION = 10
+
+
+@st.cache_resource
+def setup_logging() -> Path:
+    """Configure logging once per server process."""
+    log_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = config.log_file.parent / f"mypaperagent_{log_timestamp}.log"
+
+    root_logger = logging.getLogger()
+    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
+
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=log_level,
+            format=_LOG_FORMAT,
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(log_file),
+            ],
+        )
+    else:
+        root_logger.setLevel(log_level)
+        has_console = any(
+            isinstance(handler, logging.StreamHandler)
+            and not isinstance(handler, logging.FileHandler)
+            for handler in root_logger.handlers
+        )
+        if not has_console:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+            root_logger.addHandler(console_handler)
+        has_log_file = any(
+            isinstance(handler, logging.FileHandler)
+            and getattr(handler, "baseFilename", None) == str(log_file)
+            for handler in root_logger.handlers
+        )
+        if not has_log_file:
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+            root_logger.addHandler(file_handler)
+
+    logger = logging.getLogger(__name__)
+    logger.info("Logging configured: level=%s file=%s", config.log_level.upper(), log_file)
+    deleted_logs = cleanup_old_logs(config.log_file.parent, _LOG_RETENTION, log_file)
+    if deleted_logs:
+        logger.info("Deleted %d old log files", len(deleted_logs))
+    return log_file
+
+
+def cleanup_old_logs(log_dir: Path, keep: int, current_log: Path) -> list[Path]:
+    """Remove old log files, keeping the most recent ones by filename."""
+    log_files = sorted(log_dir.glob("mypaperagent_*.log"), reverse=True)
+    log_files = [path for path in log_files if path != current_log]
+    to_delete = log_files[keep - 1 :] if keep > 0 else log_files
+    deleted = []
+    for path in to_delete:
+        try:
+            path.unlink()
+            deleted.append(path)
+        except FileNotFoundError:
+            continue
+    return deleted
+
+_LOG_FILE = setup_logging()
+logger = logging.getLogger(__name__)
 
 # Custom CSS
 st.markdown("""
@@ -161,6 +184,12 @@ st.markdown("""
         max-width: 80px;
     }
 
+    /* Prevent sidebar collapsing/hiding */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3,
@@ -220,7 +249,7 @@ st.markdown("""
 
 # Initialize session state
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "Library"
+    st.session_state.current_page = "library"
 if "selected_paper_id" not in st.session_state:
     st.session_state.selected_paper_id = None
 if "session_started" not in st.session_state:

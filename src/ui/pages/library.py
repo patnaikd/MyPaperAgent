@@ -112,67 +112,60 @@ def show_library_page():
         st.markdown(f"**Found {len(papers)} paper(s)**")
         st.markdown("")
 
-        # Display papers in cards
+        # Display papers in a table-like layout with actions
+        status_options = [
+            ("unread", "🔵 unread"),
+            ("reading", "🟡 reading"),
+            ("completed", "🟢 completed"),
+            ("archived", "⚫ archived"),
+        ]
+        status_labels = [label for _, label in status_options]
+        status_to_label = {value: label for value, label in status_options}
+        label_to_status = {label: value for value, label in status_options}
+
+        header = st.columns([3.5, 2.5, 1, 1, 1.5, 1])
+        header[0].markdown("**Title**")
+        header[1].markdown("**Authors**")
+        header[2].markdown("**Year**")
+        header[3].markdown("**Pages**")
+        header[4].markdown("**Status**")
+        header[5].markdown("**Open**")
+        st.markdown("---")
+
         for paper in papers:
-            with st.container():
-                col1, col2 = st.columns([4, 1])
+            authors = ""
+            if paper.authors:
+                authors = paper.authors if len(paper.authors) <= 100 else paper.authors[:97] + "..."
 
-                with col1:
-                    # Title
-                    st.markdown(f"### {paper.title or 'Untitled Paper'}")
+            cols = st.columns([3.5, 2.5, 1, 1, 1.5, 1])
+            cols[0].write(paper.title or "Untitled Paper")
+            cols[1].write(authors)
+            cols[2].write(paper.year or "")
+            cols[3].write(paper.page_count or "")
 
-                    # Metadata
-                    metadata_parts = []
-                    if paper.authors:
-                        authors = paper.authors if len(paper.authors) <= 100 else paper.authors[:97] + "..."
-                        metadata_parts.append(f"👤 {authors}")
-                    if paper.year:
-                        metadata_parts.append(f"📅 {paper.year}")
-                    if paper.page_count:
-                        metadata_parts.append(f"📄 {paper.page_count} pages")
+            current_label = status_to_label.get(paper.status, "🔵 unread")
+            selected_label = cols[4].selectbox(
+                "Status",
+                status_labels,
+                index=status_labels.index(current_label),
+                key=f"status_{paper.id}",
+                label_visibility="collapsed",
+            )
+            new_status = label_to_status[selected_label]
+            if new_status != paper.status:
+                try:
+                    manager.update_paper(paper.id, status=new_status)
+                    st.success("Status updated!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to update: {e}")
 
-                    if metadata_parts:
-                        st.markdown(" • ".join(metadata_parts))
+            if cols[5].button("Open", key=f"open_{paper.id}"):
+                st.session_state.selected_paper_id = paper.id
+                st.session_state.current_page = "paper_detail"
+                st.rerun()
 
-                    # Abstract preview
-                    if paper.abstract:
-                        abstract_preview = paper.abstract[:200] + "..." if len(paper.abstract) > 200 else paper.abstract
-                        st.caption(abstract_preview)
-
-                with col2:
-                    # Status badge
-                    status_colors = {
-                        "unread": "🔵",
-                        "reading": "🟡",
-                        "completed": "🟢",
-                        "archived": "⚫"
-                    }
-                    st.markdown(f"{status_colors.get(paper.status, '⚪')} {paper.status.upper()}")
-
-                    # Actions
-                    if st.button("📖 View", key=f"view_{paper.id}", use_container_width=True):
-                        st.session_state.selected_paper_id = paper.id
-                        st.session_state.current_page = "paper_detail"
-                        st.rerun()
-
-                    # Status update
-                    new_status = st.selectbox(
-                        "Status",
-                        ["unread", "reading", "completed", "archived"],
-                        index=["unread", "reading", "completed", "archived"].index(paper.status),
-                        key=f"status_{paper.id}",
-                        label_visibility="collapsed"
-                    )
-
-                    if new_status != paper.status:
-                        try:
-                            manager.update_paper(paper.id, status=new_status)
-                            st.success("Status updated!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to update: {e}")
-
-                st.markdown("---")
+        st.markdown("---")
 
     except Exception as e:
         st.error(f"Error loading papers: {e}")

@@ -1,4 +1,5 @@
 """PDF text and metadata extraction for academic papers."""
+import json
 import logging
 import re
 from pathlib import Path
@@ -32,11 +33,12 @@ class PDFExtractor:
         self.config = get_config()
         self.min_text_threshold = min_text_threshold
 
-    def extract_from_file(self, pdf_path: Path) -> dict[str, any]:
+    def extract_from_file(self, pdf_path: Path, save_json: bool = True) -> dict[str, any]:
         """Extract text and metadata from a PDF file.
 
         Args:
             pdf_path: Path to the PDF file
+            save_json: Whether to save extracted content JSON next to the PDF
 
         Returns:
             Dictionary containing:
@@ -76,12 +78,15 @@ class PDFExtractor:
                     f"Successfully extracted {len(text)} characters "
                     f"from {page_count} pages using direct text extraction"
                 )
-                return {
+                result = {
                     "text": text,
                     "metadata": metadata,
                     "page_count": page_count,
                     "extraction_method": "text",
                 }
+                if save_json:
+                    self.save_structured_text(pdf_path, result)
+                return result
 
             # Second attempt: OCR fallback
             logger.warning(
@@ -94,12 +99,15 @@ class PDFExtractor:
                 f"Successfully extracted {len(text)} characters "
                 f"from {page_count} pages using OCR"
             )
-            return {
+            result = {
                 "text": text,
                 "metadata": metadata,
                 "page_count": page_count,
                 "extraction_method": "ocr",
             }
+            if save_json:
+                self.save_structured_text(pdf_path, result)
+            return result
 
         except Exception as e:
             logger.error(f"Failed to extract content from PDF: {e}")
@@ -201,6 +209,21 @@ class PDFExtractor:
         full_text = self._clean_text(full_text)
 
         return full_text
+
+    def save_structured_text(self, pdf_path: Path, result: dict[str, any]) -> None:
+        """Persist extracted content alongside the PDF as JSON."""
+        json_path = pdf_path.with_suffix(".json")
+        payload = {
+            "text": result.get("text", ""),
+            "metadata": result.get("metadata", {}),
+            "page_count": result.get("page_count", 0),
+            "extraction_method": result.get("extraction_method", ""),
+        }
+        try:
+            json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            logger.info(f"Saved extracted content JSON to {json_path}")
+        except OSError as exc:
+            logger.warning(f"Failed to save extracted content JSON to {json_path}: {exc}")
 
     def _clean_text(self, text: str) -> str:
         """Clean extracted text.

@@ -155,11 +155,11 @@ def show_settings_page():
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("🔄 Refresh Configuration", use_container_width=True):
+        if st.button("🔄 Refresh Configuration", width="stretch"):
             st.rerun()
 
     with col2:
-        if st.button("🗑️ Clear Cache", use_container_width=True):
+        if st.button("🗑️ Clear Cache", width="stretch"):
             st.cache_data.clear()
             st.success("Cache cleared!")
 

@@ -47,7 +47,7 @@ def show_topic_search():
 
     max_results = st.slider("Number of results", min_value=5, max_value=50, value=10)
 
-    if st.button("🔍 Search", type="primary", disabled=not topic, use_container_width=True):
+    if st.button("🔍 Search", type="primary", disabled=not topic, width="stretch"):
         search_and_display(topic=topic, max_results=max_results)
 
 
@@ -63,7 +63,7 @@ def show_author_search():
 
     max_results = st.slider("Number of results", min_value=5, max_value=50, value=10, key="author_limit")
 
-    if st.button("🔍 Search", type="primary", disabled=not author, use_container_width=True, key="author_search"):
+    if st.button("🔍 Search", type="primary", disabled=not author, width="stretch", key="author_search"):
         search_and_display(author=author, max_results=max_results)
 
 
@@ -90,7 +90,7 @@ def show_recent_papers():
 
     max_results = st.slider("Number of results", min_value=5, max_value=50, value=10, key="recent_limit")
 
-    if st.button("📅 Get Recent Papers", type="primary", use_container_width=True):
+    if st.button("📅 Get Recent Papers", type="primary", width="stretch"):
         search_and_display(category=category_code, max_results=max_results, recent=True)
 
 

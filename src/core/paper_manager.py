@@ -73,8 +73,8 @@ class PaperManager:
         logger.info(f"Adding paper from PDF: {pdf_path}")
 
         try:
-            # Extract text and metadata from PDF
-            result = self.pdf_extractor.extract_from_file(pdf_path)
+            # Extract text and metadata from PDF (delay JSON save until stored path is known)
+            result = self.pdf_extractor.extract_from_file(pdf_path, save_json=False)
 
             # Parse academic metadata
             metadata = self.metadata_parser.parse_metadata(
@@ -95,6 +95,7 @@ class PaperManager:
 
             # Copy PDF to storage
             stored_path = self._store_pdf(pdf_path)
+            self.pdf_extractor.save_structured_text(stored_path, result)
 
             # Create paper record
             paper = Paper(
