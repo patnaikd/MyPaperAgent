@@ -250,6 +250,13 @@ class PaperManager:
         """Backward-compatible wrapper for updating paper status."""
         self.update_paper_status(paper_id, status)
 
+    def update_speechify_url(self, paper_id: int, speechify_url: Optional[str]) -> None:
+        """Update the Speechify URL for a paper."""
+        paper = self.get_paper(paper_id)
+        paper.speechify_url = speechify_url or None
+        self.session.commit()
+        logger.info("Updated paper %s Speechify URL", paper_id)
+
     def delete_paper(self, paper_id: int, delete_file: bool = True) -> None:
         """Delete a paper from the library.
 

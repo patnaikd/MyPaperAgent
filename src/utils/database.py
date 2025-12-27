@@ -14,6 +14,7 @@ from sqlalchemy import (
     Text,
     create_engine,
     inspect,
+    text,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -63,6 +64,7 @@ class Paper(Base):
     doi = Column(String(100), nullable=True, unique=True, index=True)
     arxiv_id = Column(String(50), nullable=True, unique=True, index=True)
     url = Column(String(500), nullable=True)
+    speechify_url = Column(String(500), nullable=True)
     file_path = Column(String(500), nullable=True)  # Local PDF path
     status = Column(String(20), default=ReadingStatus.UNREAD.value, index=True)
     added_date = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -271,6 +273,29 @@ def ensure_database_initialized(engine) -> None:
     expected_tables = set(Base.metadata.tables.keys())
     if expected_tables - existing_tables:
         Base.metadata.create_all(bind=engine)
+        inspector = inspect(engine)
+    _ensure_paper_columns(engine, inspector)
+
+
+def _ensure_paper_columns(engine, inspector) -> None:
+    """Add missing columns to the papers table for existing databases."""
+    if "papers" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("papers")}
+    missing_columns = {
+        "speechify_url": "speechify_url VARCHAR(500)",
+    }
+
+    for name, ddl in missing_columns.items():
+        if name in existing_columns:
+            continue
+        try:
+            with engine.begin() as connection:
+                connection.execute(text(f"ALTER TABLE papers ADD COLUMN {ddl}"))
+            logger.info("Added missing column '%s' to papers table.", name)
+        except Exception as exc:
+            logger.warning("Failed to add column '%s' to papers table: %s", name, exc)
 
 
 def drop_all_tables() -> None:

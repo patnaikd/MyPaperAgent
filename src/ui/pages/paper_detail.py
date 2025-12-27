@@ -16,6 +16,7 @@ from src.ui.ui_helpers import render_footer
 
 
 logger = logging.getLogger(__name__)
+SPEECHIFY_ICON_URL = "https://cdn.speechify.com/web/assets/favicon.png"
 
 
 def show_paper_detail_page():
@@ -66,8 +67,71 @@ def show_paper_detail_page():
         st.markdown(f"**Published in:** {paper.journal}")
     if paper.doi:
         st.markdown(f"**DOI:** {paper.doi}")
+    speechify_url = paper.speechify_url or ""
+    listen_url = speechify_url or "https://app.speechify.com/"
+    edit_key = f"edit_speechify_{paper_id}"
+    speechify_key = f"speechify_url_{paper_id}"
+    if edit_key not in st.session_state:
+        st.session_state[edit_key] = False
+
     if paper.url:
-        st.markdown(f"**URL:** [{paper.url}]({paper.url})")
+        listen_col, url_col = st.columns([1, 4])
+        with url_col:
+            st.markdown(f"**URL:** [{paper.url}]({paper.url})")
+        with listen_col:
+            st.markdown(
+                f"""
+                <a href="{listen_url}" target="_blank"
+                   style="display:inline-flex; align-items:center; gap:0.4rem;
+                          text-decoration:none; border:1px solid #d0d7de;
+                          padding:0.25rem 0.6rem; border-radius:0.5rem;
+                          background:#ffffff;">
+                    <img src="{SPEECHIFY_ICON_URL}" alt="Speechify" width="18" height="18" />
+                    <span style="color:#111111; font-size:0.9rem;">Listen</span>
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    if speechify_url and not st.session_state[edit_key]:
+        if st.button("✏️ Edit Speechify URL", key=f"edit_speechify_btn_{paper_id}"):
+            st.session_state[speechify_key] = speechify_url
+            st.session_state[edit_key] = True
+            st.rerun()
+
+    show_form = not speechify_url or st.session_state[edit_key]
+    if show_form:
+        if speechify_key not in st.session_state:
+            st.session_state[speechify_key] = speechify_url
+        st.markdown("**Speechify URL:**")
+        speechify_input = st.text_input(
+            "Speechify URL",
+            placeholder="https://app.speechify.com/...",
+            key=speechify_key,
+            help="Optional link to a Speechify version of this paper.",
+            label_visibility="collapsed",
+        )
+        form_col1, form_col2 = st.columns([1, 1])
+        with form_col1:
+            save_speechify = st.button("💾 Save", key=f"save_speechify_{paper_id}")
+        with form_col2:
+            cancel_edit = False
+            if speechify_url:
+                cancel_edit = st.button(
+                    "Cancel",
+                    key=f"cancel_speechify_{paper_id}",
+                )
+        if save_speechify:
+            try:
+                manager.update_speechify_url(paper_id, speechify_input.strip())
+                st.session_state[edit_key] = False
+                st.success("Speechify URL updated.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to update Speechify URL: {e}")
+        if cancel_edit:
+            st.session_state[edit_key] = False
+            st.rerun()
 
     # Abstract
     if paper.abstract:
