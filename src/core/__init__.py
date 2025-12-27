@@ -8,6 +8,7 @@ import logging
 
 from src.core.note_manager import NoteManager, NoteManagerError
 from src.core.paper_manager import PaperManager, PaperManagerError, PaperNotFoundError
+from src.core.qa_manager import QAHistoryManager, QAHistoryError
 
 
 logger = logging.getLogger(__name__)
@@ -18,4 +19,6 @@ __all__ = [
     "PaperManager",
     "PaperManagerError",
     "PaperNotFoundError",
+    "QAHistoryManager",
+    "QAHistoryError",
 ]

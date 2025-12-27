@@ -85,9 +85,10 @@ class QuizGenerator(BaseAgent):
             self.model,
             system_prompt=system_prompt,
             model_settings=model_settings,
-            result_type=list[QuizQuestionOutput],
+            output_type=list[QuizQuestionOutput],
         )
         result = agent.run_sync(full_prompt)
+        logger.debug("Quiz generator output: %s", result.output)
 
         questions = [
             {
@@ -96,7 +97,7 @@ class QuizGenerator(BaseAgent):
                 "explanation": item.explanation,
                 "difficulty": item.difficulty or difficulty,
             }
-            for item in result.data
+            for item in result.output
         ]
 
         # Save to database if requested
@@ -195,7 +196,18 @@ Return ONLY a valid JSON array of questions with no additional text."""
             paper_id: Paper ID
             questions: List of question dictionaries
         """
+        existing = {
+            (q.question, q.answer)
+            for q in self.session.query(QuizQuestion)
+            .filter(QuizQuestion.paper_id == paper_id)
+            .all()
+        }
+        new_count = 0
+
         for q in questions:
+            key = (q.get("question", ""), q.get("answer", ""))
+            if key in existing:
+                continue
             quiz_question = QuizQuestion(
                 paper_id=paper_id,
                 question=q["question"],
@@ -204,9 +216,11 @@ Return ONLY a valid JSON array of questions with no additional text."""
                 difficulty=q.get("difficulty", QuestionDifficulty.MEDIUM.value),
             )
             self.session.add(quiz_question)
+            existing.add(key)
+            new_count += 1
 
         self.session.commit()
-        logger.info(f"Saved {len(questions)} questions to database")
+        logger.info("Saved %s new quiz questions to database", new_count)
 
     def get_quiz_questions(
         self, paper_id: int, limit: Optional[int] = None

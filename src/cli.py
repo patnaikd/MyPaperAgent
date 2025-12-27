@@ -203,6 +203,11 @@ def ask(paper_id: int, question: str) -> None:
             for source in result["sources"]:
                 console.print(f"  • Paper {source['paper_id']}: {source['title']}")
 
+        if result.get("saved"):
+            console.print("[dim]✓ Question saved to history[/dim]")
+        else:
+            console.print("[dim]ℹ Question already saved[/dim]")
+
         console.print()
 
     except Exception as e:
@@ -244,7 +249,7 @@ def quiz(paper_id: int, length: int, difficulty: str) -> None:
             console.print(f"[dim]Difficulty: {q.get('difficulty', 'medium')}[/dim]")
             console.print()
 
-        console.print(f"[dim]✓ Questions saved to database for future review[/dim]\n")
+        console.print(f"[dim]✓ Questions stored in database (skips duplicates)[/dim]\n")
 
     except Exception as e:
         console.print(f"\n[bold red]✗ Error:[/bold red] {e}\n", style="red")
@@ -261,9 +266,12 @@ def note(paper_id: int, content: str, section: Optional[str]) -> None:
         console.print(f"\n[bold cyan]Adding note to paper {paper_id}[/bold cyan]\n")
 
         note_manager = NoteManager()
-        note_id = note_manager.add_note(paper_id, content, section=section)
+        note_id, created = note_manager.add_note_if_new(paper_id, content, section=section)
 
-        console.print(f"[bold green]✓ Note added successfully![/bold green]")
+        if created:
+            console.print(f"[bold green]✓ Note added successfully![/bold green]")
+        else:
+            console.print(f"[bold yellow]ℹ Note already exists.[/bold yellow]")
         console.print(f"[cyan]Note ID:[/cyan] {note_id}\n")
 
     except Exception as e:

@@ -11,6 +11,7 @@ except ImportError:  # pragma: no cover - supports older pydantic_ai versions
     from pydantic_ai.models import ModelSettings
 
 from src.agents.base import BaseAgent
+from src.core.qa_manager import QAHistoryManager
 from src.rag.retriever import RAGRetriever
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class QAAgent(BaseAgent):
         """Initialize Q&A agent."""
         super().__init__(temperature=0.2)  # Low temperature for factual answers
         self.retriever = RAGRetriever()
+        self.qa_history = QAHistoryManager()
 
     def answer_question(
         self,
@@ -100,20 +102,24 @@ Context from the paper(s):
             self.model,
             system_prompt=system_prompt,
             model_settings=model_settings,
-            result_type=QAAnswerOutput,
+            output_type=QAAnswerOutput,
         )
         result = agent.run_sync(prompt)
-        answer = self._format_answer(result.data)
+        logger.debug("Q&A agent output: %s", result.output)
+        answer = self._format_answer(result.output)
 
         # Extract sources from context
         sources = self._extract_sources(context)
 
-        return {
+        saved = self._save_qa_history(question, answer, sources, paper_id)
+        result_payload = {
             "answer": answer,
             "sources": sources,
             "question": question,
             "paper_id": paper_id,
+            "saved": saved,
         }
+        return result_payload
 
     def _extract_sources(self, context: str) -> list[dict[str, any]]:
         """Extract source information from context.
@@ -125,6 +131,7 @@ Context from the paper(s):
             List of source dictionaries
         """
         sources = []
+        seen = set()
         # Context format: [Paper X: Title]\nText\n---\n
         parts = context.split("\n---\n")
 
@@ -140,6 +147,10 @@ Context from the paper(s):
                             paper_id_str, title = paper_info.split(": ", 1)
                             paper_id = int(paper_id_str.split()[1])
 
+                            key = (paper_id, title)
+                            if key in seen:
+                                continue
+                            seen.add(key)
                             sources.append({"paper_id": paper_id, "title": title})
                         except (ValueError, IndexError):
                             pass
@@ -209,19 +220,23 @@ Answer the new question, taking into account the conversation history. Be concis
             self.model,
             system_prompt=system_prompt,
             model_settings=model_settings,
-            result_type=QAAnswerOutput,
+            output_type=QAAnswerOutput,
         )
         result = agent.run_sync(prompt)
-        answer = self._format_answer(result.data)
+        logger.debug("Q&A follow-up output: %s", result.output)
+        answer = self._format_answer(result.output)
 
         sources = self._extract_sources(context)
 
-        return {
+        saved = self._save_qa_history(question, answer, sources, paper_id)
+        result_payload = {
             "answer": answer,
             "sources": sources,
             "question": question,
             "paper_id": paper_id,
+            "saved": saved,
         }
+        return result_payload
 
     def _format_answer(self, response: QAAnswerOutput) -> str:
         """Format structured output into a markdown-friendly answer."""
@@ -232,6 +247,25 @@ Answer the new question, taking into account the conversation history. Be concis
         if response.caveats:
             parts.append(f"Caveats:\n{response.caveats.strip()}")
         return "\n\n".join(parts).strip()
+
+    def _save_qa_history(
+        self,
+        question: str,
+        answer: str,
+        sources: list[dict[str, any]],
+        paper_id: Optional[int],
+    ) -> None:
+        """Persist Q&A history when a paper ID is available."""
+        if paper_id is None:
+            return False
+        try:
+            _, created = self.qa_history.add_entry_if_new(
+                paper_id, question, answer, sources
+            )
+            return created
+        except Exception as exc:
+            logger.warning("Failed to save Q&A history: %s", exc)
+            return False
 
 
 def answer_question(

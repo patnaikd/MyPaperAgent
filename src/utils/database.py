@@ -83,6 +83,9 @@ class Paper(Base):
     quiz_questions = relationship(
         "QuizQuestion", back_populates="paper", cascade="all, delete-orphan"
     )
+    qa_entries = relationship(
+        "QAEntry", back_populates="paper", cascade="all, delete-orphan"
+    )
     embeddings = relationship(
         "Embedding", back_populates="paper", cascade="all, delete-orphan"
     )
@@ -190,6 +193,25 @@ class QuizQuestion(Base):
         return f"<QuizQuestion(id={self.id}, paper_id={self.paper_id}, difficulty={self.difficulty})>"
 
 
+class QAEntry(Base):
+    """Question/answer entries for papers."""
+
+    __tablename__ = "qa_entries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False, index=True)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    sources = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    paper = relationship("Paper", back_populates="qa_entries")
+
+    def __repr__(self) -> str:
+        return f"<QAEntry(id={self.id}, paper_id={self.paper_id})>"
+
+
 class Embedding(Base):
     """Vector embeddings for paper chunks."""
 
@@ -245,7 +267,9 @@ def init_database() -> None:
 def ensure_database_initialized(engine) -> None:
     """Create tables if the database is uninitialized."""
     inspector = inspect(engine)
-    if not inspector.has_table("papers"):
+    existing_tables = set(inspector.get_table_names())
+    expected_tables = set(Base.metadata.tables.keys())
+    if expected_tables - existing_tables:
         Base.metadata.create_all(bind=engine)
 
 

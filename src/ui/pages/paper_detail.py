@@ -10,6 +10,7 @@ from src.agents.quiz_generator import QuizGenerator
 from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
+from src.core.qa_manager import QAHistoryManager
 from src.utils.database import NoteType
 from src.ui.ui_helpers import render_footer
 
@@ -133,7 +134,7 @@ def show_summarize_tab(paper_id: int):
                 st.markdown(summary)
 
                 if save_as_note:
-                    st.info("💾 Summary saved as AI-generated note")
+                    st.info("💾 Summary stored in notes (skips duplicates)")
 
             except Exception as e:
                 st.error(f"Failed to generate summary: {e}")
@@ -198,6 +199,8 @@ def show_qa_tab(paper_id: int):
     """Show Q&A interface."""
     st.markdown("### ❓ Ask Questions About This Paper")
 
+    qa_manager = QAHistoryManager()
+
     # Question input
     question = st.text_area(
         "Your Question",
@@ -224,6 +227,10 @@ def show_qa_tab(paper_id: int):
                     for source in result["sources"]:
                         st.caption(f"📄 Paper {source['paper_id']}: {source['title']}")
 
+                if result.get("saved"):
+                    st.info("💾 Question saved to history")
+                else:
+                    st.info("ℹ️ Question already saved")
             except Exception as e:
                 st.error(f"Failed to generate answer: {e}")
                 st.exception(e)
@@ -232,19 +239,30 @@ def show_qa_tab(paper_id: int):
     st.markdown("---")
     st.markdown("#### Recent Questions")
 
-    # Initialize Q&A history in session state
-    if "qa_history" not in st.session_state:
-        st.session_state.qa_history = []
-
     # Show history
-    if st.session_state.qa_history:
-        for i, qa in enumerate(reversed(st.session_state.qa_history[-5:])):
-            if qa.get("paper_id") == paper_id:
-                with st.expander(f"Q: {qa['question'][:100]}..."):
-                    st.markdown(f"**Q:** {qa['question']}")
-                    st.markdown(f"**A:** {qa['answer']}")
-    else:
-        st.info("No questions asked yet. Ask your first question above!")
+    try:
+        history_entries = qa_manager.get_entries(paper_id, limit=5)
+        if history_entries:
+            for entry in history_entries:
+                with st.expander(f"Q: {entry.question[:100]}..."):
+                    st.markdown(f"**Q:** {entry.question}")
+                    st.markdown(f"**A:** {entry.answer}")
+                    sources = qa_manager.deserialize_sources(entry.sources)
+                    if sources:
+                        st.markdown("**Sources:**")
+                        seen = set()
+                        for source in sources:
+                            key = (source.get("paper_id"), source.get("title"))
+                            if key in seen:
+                                continue
+                            seen.add(key)
+                            st.caption(
+                                f"📄 Paper {source.get('paper_id')}: {source.get('title')}"
+                            )
+        else:
+            st.info("No questions asked yet. Ask your first question above!")
+    except Exception as e:
+        st.warning(f"Could not load question history: {e}")
 
 
 def show_quiz_tab(paper_id: int):
@@ -286,7 +304,7 @@ def show_quiz_tab(paper_id: int):
                                 st.info(q['explanation'])
                             st.caption(f"Difficulty: {q.get('difficulty', 'medium')}")
 
-                    st.info("💾 Questions saved to database for future review")
+                    st.info("💾 Questions stored in database (skips duplicates)")
 
                 else:
                     st.warning("Failed to generate questions. Please try again.")
@@ -339,12 +357,15 @@ def show_notes_tab(paper_id: int):
         if st.button("💾 Save Note", disabled=not note_content, width="stretch"):
             try:
                 note_manager = NoteManager()
-                note_id = note_manager.add_note(
+                _, created = note_manager.add_note_if_new(
                     paper_id,
                     note_content,
                     section=section if section else None
                 )
-                st.success("✅ Note saved successfully!")
+                if created:
+                    st.success("✅ Note saved successfully!")
+                else:
+                    st.info("ℹ️ That note is already saved.")
                 st.rerun()
 
             except Exception as e:

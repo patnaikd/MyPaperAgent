@@ -73,6 +73,45 @@ class NoteManager:
             logger.error(f"Failed to add note: {e}")
             raise NoteManagerError(f"Failed to add note: {str(e)}") from e
 
+    def add_note_if_new(
+        self,
+        paper_id: int,
+        content: str,
+        note_type: str = NoteType.PERSONAL.value,
+        section: Optional[str] = None,
+    ) -> tuple[int, bool]:
+        """Add a note unless an identical note already exists.
+
+        Returns:
+            (note_id, created_new)
+        """
+        existing = self.find_note(
+            paper_id=paper_id, content=content, note_type=note_type, section=section
+        )
+        if existing:
+            return existing.id, False
+        note_id = self.add_note(paper_id, content, note_type=note_type, section=section)
+        return note_id, True
+
+    def find_note(
+        self,
+        paper_id: int,
+        content: str,
+        note_type: str = NoteType.PERSONAL.value,
+        section: Optional[str] = None,
+    ) -> Optional[Note]:
+        """Find an existing note with matching fields."""
+        query = self.session.query(Note).filter(
+            Note.paper_id == paper_id,
+            Note.note_type == note_type,
+            Note.content == content,
+        )
+        if section is None:
+            query = query.filter(Note.section.is_(None))
+        else:
+            query = query.filter(Note.section == section)
+        return query.first()
+
     def get_note(self, note_id: int) -> Note:
         """Get a note by ID.
 

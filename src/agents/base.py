@@ -1,13 +1,9 @@
 """Base agent class for PydanticAI-powered agents."""
 import logging
 from typing import Optional
-
-try:
-    from pydantic_ai import Agent, ModelSettings
-except ImportError:  # pragma: no cover - supports older pydantic_ai versions
-    from pydantic_ai import Agent
-    from pydantic_ai.models import ModelSettings
+from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 
 from src.utils.config import get_config
 
@@ -25,7 +21,7 @@ class BaseAgent:
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "claude-haiku-4-5",
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ):
@@ -43,9 +39,8 @@ class BaseAgent:
 
         # Initialize PydanticAI model
         try:
-            self.model = AnthropicModel(
-                self.model_name, api_key=self.config.anthropic_api_key
-            )
+            provider = AnthropicProvider(api_key=self.config.anthropic_api_key)
+            self.model = AnthropicModel(self.model_name, provider=provider)
             logger.info(f"Initialized {self.__class__.__name__} with model {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize PydanticAI model: {e}")
@@ -81,8 +76,9 @@ class BaseAgent:
             )
             agent = Agent(self.model, system_prompt=system or "", model_settings=model_settings)
             result = agent.run_sync(prompt)
+            logger.debug("Agent result output: %s", result.output)
 
-            text = result.data
+            text = result.output
             if not isinstance(text, str):
                 text = str(text)
 

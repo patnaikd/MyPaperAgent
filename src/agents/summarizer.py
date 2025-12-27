@@ -83,20 +83,24 @@ class SummarizationAgent(BaseAgent):
             self.model,
             system_prompt=system_prompt,
             model_settings=model_settings,
-            result_type=SummaryOutput,
+            output_type=SummaryOutput,
         )
         result = agent.run_sync(full_prompt)
-        summary = result.data.summary
+        logger.debug("Summarization agent output: %s", result.output)
+        summary = result.output.summary
 
         # Save as note if requested
         if save_as_note:
-            self.note_manager.add_note(
+            _, created = self.note_manager.add_note_if_new(
                 paper_id=paper_id,
                 content=summary,
                 note_type=NoteType.AI_GENERATED.value,
                 section=f"Summary ({level})",
             )
-            logger.info(f"Saved {level} summary as AI note")
+            if created:
+                logger.info("Saved %s summary as AI note", level)
+            else:
+                logger.info("Skipped saving duplicate %s summary note", level)
 
         return summary
 
