@@ -1,6 +1,14 @@
 """Summarization agent for academic papers."""
 import logging
-from typing import Literal, Optional
+from typing import Literal
+
+from pydantic import BaseModel
+
+try:
+    from pydantic_ai import Agent, ModelSettings
+except ImportError:  # pragma: no cover - supports older pydantic_ai versions
+    from pydantic_ai import Agent
+    from pydantic_ai.models import ModelSettings
 
 from src.agents.base import BaseAgent
 from src.core.note_manager import NoteManager
@@ -9,6 +17,12 @@ from src.rag.retriever import RAGRetriever
 from src.utils.database import NoteType
 
 logger = logging.getLogger(__name__)
+
+
+class SummaryOutput(BaseModel):
+    """Structured summary output."""
+
+    summary: str
 
 
 class SummarizationAgent(BaseAgent):
@@ -54,13 +68,25 @@ class SummarizationAgent(BaseAgent):
         # Generate prompt
         prompt = self._generate_prompt(paper, level)
 
-        # Generate summary
-        summary = self.generate_with_context(
-            prompt=prompt,
-            context=context,
-            system=system_prompt,
+        full_prompt = f"""Context:
+{context}
+
+---
+
+{prompt}"""
+
+        model_settings = ModelSettings(
+            temperature=self.temperature,
             max_tokens=self._get_max_tokens(level),
         )
+        agent = Agent(
+            self.model,
+            system_prompt=system_prompt,
+            model_settings=model_settings,
+            result_type=SummaryOutput,
+        )
+        result = agent.run_sync(full_prompt)
+        summary = result.data.summary
 
         # Save as note if requested
         if save_as_note:
@@ -87,13 +113,25 @@ class SummarizationAgent(BaseAgent):
 Your summaries are clear, accurate, and capture the essential points.
 Focus on the key contributions, methodology, and findings."""
 
+        schema_prompt = """Return data that matches the provided output schema. Put the entire summary in the
+summary field. Do not wrap the response in markdown, code fences, or extra text.
+
+Example (schema-shaped, not JSON):
+summary: "## Main Contribution
+...
+"
+"""
+
         level_prompts = {
             "quick": base_prompt
-            + "\n\nGenerate a BRIEF summary (2-3 paragraphs) suitable for quickly understanding the paper's main point.",
+            + "\n\nGenerate a BRIEF summary (2-3 paragraphs) suitable for quickly understanding the paper's main point.\n\n"
+            + schema_prompt,
             "detailed": base_prompt
-            + "\n\nGenerate a DETAILED summary covering:\n- Main contribution\n- Methodology\n- Key findings\n- Limitations\n- Significance",
+            + "\n\nGenerate a DETAILED summary covering:\n- Main contribution\n- Methodology\n- Key findings\n- Limitations\n- Significance\n\n"
+            + schema_prompt,
             "full": base_prompt
-            + "\n\nGenerate a COMPREHENSIVE summary including:\n- Background and motivation\n- Detailed methodology\n- All key findings and results\n- Discussion and implications\n- Limitations and future work\n- How this relates to the broader field",
+            + "\n\nGenerate a COMPREHENSIVE summary including:\n- Background and motivation\n- Detailed methodology\n- All key findings and results\n- Discussion and implications\n- Limitations and future work\n- How this relates to the broader field\n\n"
+            + schema_prompt,
         }
 
         return level_prompts[level]

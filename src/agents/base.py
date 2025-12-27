@@ -1,8 +1,13 @@
-"""Base agent class for Claude-powered agents."""
+"""Base agent class for PydanticAI-powered agents."""
 import logging
-from typing import Any, Optional
+from typing import Optional
 
-from anthropic import Anthropic
+try:
+    from pydantic_ai import Agent, ModelSettings
+except ImportError:  # pragma: no cover - supports older pydantic_ai versions
+    from pydantic_ai import Agent
+    from pydantic_ai.models import ModelSettings
+from pydantic_ai.models.anthropic import AnthropicModel
 
 from src.utils.config import get_config
 
@@ -16,7 +21,7 @@ class AgentError(Exception):
 
 
 class BaseAgent:
-    """Base class for Claude-powered agents."""
+    """Base class for PydanticAI-powered agents."""
 
     def __init__(
         self,
@@ -32,16 +37,18 @@ class BaseAgent:
             max_tokens: Maximum tokens in response
         """
         self.config = get_config()
-        self.model = model
+        self.model_name = model
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-        # Initialize Claude client
+        # Initialize PydanticAI model
         try:
-            self.client = Anthropic(api_key=self.config.anthropic_api_key)
-            logger.info(f"Initialized {self.__class__.__name__} with model {model}")
+            self.model = AnthropicModel(
+                self.model_name, api_key=self.config.anthropic_api_key
+            )
+            logger.info(f"Initialized {self.__class__.__name__} with model {self.model_name}")
         except Exception as e:
-            logger.error(f"Failed to initialize Anthropic client: {e}")
+            logger.error(f"Failed to initialize PydanticAI model: {e}")
             raise AgentError(f"Failed to initialize agent: {str(e)}") from e
 
     def generate(
@@ -66,22 +73,18 @@ class BaseAgent:
             AgentError: If generation fails
         """
         try:
-            logger.debug(f"Generating response with {self.model}")
+            logger.debug(f"Generating response with {self.model_name}")
 
-            # Prepare messages
-            messages = [{"role": "user", "content": prompt}]
-
-            # Make API call
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens or self.max_tokens,
+            model_settings = ModelSettings(
                 temperature=temperature or self.temperature,
-                system=system or "",
-                messages=messages,
+                max_tokens=max_tokens or self.max_tokens,
             )
+            agent = Agent(self.model, system_prompt=system or "", model_settings=model_settings)
+            result = agent.run_sync(prompt)
 
-            # Extract text from response
-            text = response.content[0].text
+            text = result.data
+            if not isinstance(text, str):
+                text = str(text)
 
             logger.debug(f"Generated {len(text)} characters")
             return text
@@ -127,38 +130,3 @@ class BaseAgent:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-
-    def extract_json(self, text: str) -> dict[str, Any]:
-        """Extract JSON from response text.
-
-        Looks for JSON blocks in markdown code fences or raw JSON.
-
-        Args:
-            text: Response text potentially containing JSON
-
-        Returns:
-            Parsed JSON dictionary
-
-        Raises:
-            AgentError: If JSON cannot be extracted or parsed
-        """
-        import json
-        import re
-
-        # Try to find JSON in code fence
-        json_match = re.search(r"```json\s*\n(.*?)\n```", text, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Try to find raw JSON
-            json_match = re.search(r"\{.*\}", text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-            else:
-                json_str = text
-
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            raise AgentError(f"Failed to parse JSON from response: {str(e)}") from e

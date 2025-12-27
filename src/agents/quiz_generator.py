@@ -2,11 +2,28 @@
 import logging
 from typing import Literal, Optional
 
+from pydantic import BaseModel
+
+try:
+    from pydantic_ai import Agent, ModelSettings
+except ImportError:  # pragma: no cover - supports older pydantic_ai versions
+    from pydantic_ai import Agent
+    from pydantic_ai.models import ModelSettings
+
 from src.agents.base import BaseAgent
 from src.core.paper_manager import PaperManager
 from src.utils.database import QuizQuestion, QuestionDifficulty, get_session
 
 logger = logging.getLogger(__name__)
+
+
+class QuizQuestionOutput(BaseModel):
+    """Structured quiz question output."""
+
+    question: str
+    answer: str
+    explanation: str = ""
+    difficulty: Literal["easy", "medium", "hard", "adaptive"] = "medium"
 
 
 class QuizGenerator(BaseAgent):
@@ -53,12 +70,34 @@ class QuizGenerator(BaseAgent):
         system_prompt = self._get_system_prompt(difficulty)
         prompt = self._generate_prompt(num_questions, difficulty)
 
-        response = self.generate_with_context(
-            prompt=prompt, context=context, system=system_prompt, max_tokens=4000
-        )
+        full_prompt = f"""Context:
+{context}
 
-        # Parse questions
-        questions = self._parse_questions(response, difficulty)
+---
+
+{prompt}"""
+
+        model_settings = ModelSettings(
+            temperature=self.temperature,
+            max_tokens=4000,
+        )
+        agent = Agent(
+            self.model,
+            system_prompt=system_prompt,
+            model_settings=model_settings,
+            result_type=list[QuizQuestionOutput],
+        )
+        result = agent.run_sync(full_prompt)
+
+        questions = [
+            {
+                "question": item.question,
+                "answer": item.answer,
+                "explanation": item.explanation,
+                "difficulty": item.difficulty or difficulty,
+            }
+            for item in result.data
+        ]
 
         # Save to database if requested
         if save_to_db:
@@ -83,18 +122,17 @@ Your questions should:
 - Be clear and unambiguous
 - Have definitive correct answers
 - Include helpful explanations
+- Set difficulty to one of: easy, medium, hard, adaptive
 
-Generate questions in this exact JSON format:
-```json
-[
-  {
-    "question": "What is the main contribution of this paper?",
-    "answer": "The paper introduces...",
-    "explanation": "This is correct because...",
-    "difficulty": "medium"
-  }
-]
-```"""
+Return data that matches the provided output schema. Do not wrap the response in markdown,
+code fences, or extra text.
+
+Example (schema-shaped, not JSON):
+question: "What is the main contribution of this paper?"
+answer: "The paper introduces ..."
+explanation: "This is correct because ..."
+difficulty: "medium"
+"""
 
     def _generate_prompt(self, num_questions: int, difficulty: str) -> str:
         """Generate prompt for quiz generation.
@@ -149,46 +187,6 @@ Return ONLY a valid JSON array of questions with no additional text."""
             context_parts.append(f"\nPaper Content:\n{paper.full_text[:12000]}")
 
         return "\n".join(context_parts)
-
-    def _parse_questions(
-        self, response: str, default_difficulty: str
-    ) -> list[dict[str, any]]:
-        """Parse questions from JSON response.
-
-        Args:
-            response: JSON response from Claude
-            default_difficulty: Default difficulty if not specified
-
-        Returns:
-            List of question dictionaries
-
-        Raises:
-            AgentError: If parsing fails
-        """
-        try:
-            questions_data = self.extract_json(response)
-
-            # Ensure it's a list
-            if isinstance(questions_data, dict):
-                questions_data = [questions_data]
-
-            questions = []
-            for q in questions_data:
-                question = {
-                    "question": q.get("question", ""),
-                    "answer": q.get("answer", ""),
-                    "explanation": q.get("explanation", ""),
-                    "difficulty": q.get("difficulty", default_difficulty),
-                }
-                questions.append(question)
-
-            logger.info(f"Parsed {len(questions)} questions")
-            return questions
-
-        except Exception as e:
-            logger.error(f"Failed to parse questions: {e}")
-            # Return empty list instead of raising to be more forgiving
-            return []
 
     def _save_questions(self, paper_id: int, questions: list[dict[str, any]]) -> None:
         """Save questions to database.
