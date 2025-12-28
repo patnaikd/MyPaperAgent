@@ -79,6 +79,21 @@ def show_library_page():
                    (p.authors and search_lower in p.authors.lower())
             ]
 
+        status_priority = {
+            ReadingStatus.READING.value: 0,
+            ReadingStatus.UNREAD.value: 1,
+            ReadingStatus.COMPLETED.value: 2,
+            ReadingStatus.ARCHIVED.value: 3,
+        }
+        papers = sorted(
+            papers,
+            key=lambda paper: (
+                status_priority.get(paper.status, 4),
+                -(paper.year or -1),
+                (paper.title or "").lower(),
+            ),
+        )
+
         if not papers:
             st.info("No papers found. Add your first paper using the 'Add Paper' page!")
             if st.button("➕ Go to Add Paper"):
