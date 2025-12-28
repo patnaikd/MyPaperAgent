@@ -1,13 +1,12 @@
 """Settings page - view and manage configuration."""
-import logging
+import zipfile
+from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
 
 from src.utils.config import get_config
 from src.ui.ui_helpers import render_footer
-
-
-logger = logging.getLogger(__name__)
 
 
 def show_settings_page():
@@ -152,7 +151,7 @@ def show_settings_page():
     st.markdown("---")
     st.markdown("### 🔧 Actions")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("🔄 Refresh Configuration", width="stretch"):
@@ -162,6 +161,15 @@ def show_settings_page():
         if st.button("🗑️ Clear Cache", width="stretch"):
             st.cache_data.clear()
             st.success("Cache cleared!")
+
+    with col3:
+        if st.button("💾 Backup Data", width="stretch"):
+            with st.spinner("Creating backup..."):
+                try:
+                    backup_path = _create_data_backup()
+                    st.success(f"Backup created: {backup_path}")
+                except Exception as e:
+                    st.error(f"Failed to create backup: {e}")
 
     # Danger zone
     with st.expander("⚠️ Danger Zone", expanded=False):
@@ -174,3 +182,40 @@ def show_settings_page():
             st.error("This feature is disabled for safety. Delete the vector_db directory manually if needed.")
 
     render_footer()
+
+
+def _create_data_backup() -> Path:
+    config = get_config()
+    paper_dir = config.pdf_storage_path
+    database_path = config.database_path
+    vector_db_dir = config.vector_db_path
+    if not paper_dir.exists():
+        raise FileNotFoundError(f"Paper directory not found: {paper_dir}")
+    if not database_path.exists():
+        raise FileNotFoundError(f"Database file not found: {database_path}")
+    if not vector_db_dir.exists():
+        raise FileNotFoundError(f"Vector DB directory not found: {vector_db_dir}")
+
+    backup_dir = paper_dir.parent / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = backup_dir / f"data-backup-{timestamp}.zip"
+
+    data_root = paper_dir.parent
+
+    with zipfile.ZipFile(backup_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for path in paper_dir.rglob("*"):
+            if path.is_file():
+                arcname = path.relative_to(data_root)
+                zipf.write(path, arcname.as_posix())
+
+        db_arcname = database_path.relative_to(data_root)
+        zipf.write(database_path, db_arcname.as_posix())
+
+        for path in vector_db_dir.rglob("*"):
+            if path.is_file():
+                arcname = path.relative_to(data_root)
+                zipf.write(path, arcname.as_posix())
+
+    return backup_path
