@@ -1,15 +1,9 @@
 """Library page - view and manage papers."""
-import logging
-
 import streamlit as st
-from datetime import datetime
 
 from src.core.paper_manager import PaperManager
 from src.utils.database import ReadingStatus
 from src.ui.ui_helpers import render_footer
-
-
-logger = logging.getLogger(__name__)
 
 
 def show_library_page():
@@ -61,21 +55,6 @@ def show_library_page():
 
     st.markdown("---")
 
-    # Quick stats
-    try:
-        total_papers = manager.get_paper_count()
-        papers_for_stats = manager.list_papers(limit=1000)
-        completed = sum(1 for p in papers_for_stats if p.status == ReadingStatus.COMPLETED.value)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Papers", total_papers)
-        with col2:
-            st.metric("Completed", completed)
-        st.markdown("---")
-    except Exception:
-        st.metric("Total Papers", "N/A")
-        st.markdown("---")
-
     # Get papers
     try:
         status_map = {
@@ -108,8 +87,23 @@ def show_library_page():
             render_footer()
             return
 
-        # Display count
-        st.markdown(f"**Found {len(papers)} paper(s)**")
+        # Display count and stats
+        try:
+            total_papers = manager.get_paper_count()
+            papers_for_stats = manager.list_papers(limit=1000)
+            completed = sum(
+                1 for p in papers_for_stats if p.status == ReadingStatus.COMPLETED.value
+            )
+        except Exception:
+            total_papers = "N/A"
+            completed = "N/A"
+        col1, col2, col3 = st.columns([2.5, 1, 1])
+        with col1:
+            st.markdown(f"**Found {len(papers)} paper(s)**")
+        with col2:
+            st.metric("Total Papers", total_papers)
+        with col3:
+            st.metric("Completed", completed)
         st.markdown("")
 
         # Display papers in a table-like layout with actions

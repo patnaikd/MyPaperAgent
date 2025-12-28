@@ -78,7 +78,7 @@ The script will install `uv` if needed, sync dependencies, create `.env` from
 
 The UI provides:
 - 📚 Visual paper library with filtering and search
-- ➕ Easy PDF upload and URL import
+- ➕ Easy URL import
 - 📖 Interactive paper viewer with AI features (summarize, Q&A, quiz)
 - 🔍 Semantic search interface
 - 🌐 Paper discovery from arXiv
@@ -144,7 +144,7 @@ MyPaperAgent uses a modular architecture:
 - **Agents** (`src/agents/`): Claude Agent SDK-based agents for complex workflows
 - **Core** (`src/core/`): Paper, note, and collection management
 - **RAG** (`src/rag/`): Vector database and semantic search
-- **Processing** (`src/processing/`): PDF extraction and metadata parsing
+- **Processing** (`src/processing/`): PDF extraction and metadata enrichment
 - **Discovery** (`src/discovery/`): Paper search and recommendations
 - **Quiz** (`src/quiz/`): Question generation and assessment
 
@@ -222,7 +222,7 @@ You'll need:
 
 - [x] Project setup and architecture
 - [x] Core paper management (add, list, delete)
-- [x] PDF text extraction and metadata parsing
+- [x] PDF text extraction and metadata enrichment
 - [x] RAG system with ChromaDB
 - [x] Summarization agent (3 levels)
 - [x] Q&A agent with RAG

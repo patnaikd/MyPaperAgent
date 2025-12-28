@@ -1,6 +1,5 @@
 """Paper detail page - view paper with AI features."""
 import json
-import logging
 import re
 from datetime import datetime
 from pathlib import Path
@@ -17,12 +16,8 @@ from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.core.qa_manager import QAHistoryManager
-from src.discovery.arxiv_search import ArxivSearch
 from src.utils.database import NoteType
 from src.ui.ui_helpers import render_footer
-
-
-logger = logging.getLogger(__name__)
 SPEECHIFY_ICON_URL = "https://cdn.speechify.com/web/assets/favicon.png"
 
 
@@ -75,7 +70,7 @@ def show_paper_detail_page():
     if paper.doi:
         st.markdown(f"**DOI:** {paper.doi}")
     speechify_url = paper.speechify_url or ""
-    listen_url = speechify_url or "https://app.speechify.com/"
+    listen_url = speechify_url or "https://app.speechify.com/?folder=69c666f7-edff-4893-84fc-28bed5a7b430"
     edit_key = f"edit_speechify_{paper_id}"
     speechify_key = f"speechify_url_{paper_id}"
     if edit_key not in st.session_state:
@@ -257,82 +252,45 @@ def show_summarize_tab(paper_id: int):
 def show_author_info_tab(paper) -> None:
     """Show author information gathered from web sources."""
     st.markdown("### 👥 About Authors")
+    st.caption("Author profiles are collected when the paper is added from a URL.")
 
-    has_arxiv_source = _is_arxiv_url(paper.url or "")
-    authors = [{"name": name, "author_id": None} for name in _split_authors(paper.authors or "")]
+    can_refresh = bool(
+        paper.arxiv_id
+        or paper.doi
+        or _extract_arxiv_id_from_url(paper.url or "")
+        or _extract_doi_from_url(paper.url or "")
+    )
+    if can_refresh:
+        if st.button("🔁 Refresh from Semantic Scholar", width="stretch"):
+            with st.spinner("Refreshing Semantic Scholar metadata..."):
+                try:
+                    manager = PaperManager()
+                    manager.refresh_semantic_scholar_metadata(paper.id)
+                    st.success("Semantic Scholar metadata updated.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to refresh Semantic Scholar metadata: {e}")
+    else:
+        st.info("Semantic Scholar refresh requires a DOI or arXiv ID.")
 
-    state_key = f"author_info_{paper.id}"
-    meta_key = f"{state_key}_paper_meta"
-    source_key = f"{state_key}_source"
-    author_ts_key = f"{state_key}_authors_ts"
-    meta_ts_key = f"{state_key}_meta_ts"
-    if state_key not in st.session_state:
-        stored_authors, stored_authors_ts = AuthorInfoAgent.load_author_infos_with_timestamp(
-            paper.id
-        )
-        if stored_authors:
-            st.session_state[state_key] = stored_authors
-            st.session_state[source_key] = "Database"
-            st.session_state[author_ts_key] = stored_authors_ts
-    if meta_key not in st.session_state:
-        stored_meta, stored_meta_ts = AuthorInfoAgent.load_paper_metadata_with_timestamp(
-            paper.id
-        )
-        if stored_meta:
-            st.session_state[meta_key] = stored_meta
-            st.session_state[meta_ts_key] = stored_meta_ts
+    author_infos, author_ts = AuthorInfoAgent.load_author_infos_with_timestamp(paper.id)
+    paper_meta, meta_ts = AuthorInfoAgent.load_paper_metadata_with_timestamp(paper.id)
 
-    if not authors and not has_arxiv_source and not st.session_state.get(state_key):
-        st.info("No author metadata available for this paper.")
+    if not author_infos and not paper_meta:
+        st.info("No author metadata available for this paper yet.")
         return
 
-    st.caption("Pulls data from public sources (Semantic Scholar, DBLP) when available.")
-
-    if st.button("🔍 Extract author information", type="primary", width="stretch"):
-        with st.spinner("Gathering author information..."):
-            try:
-                agent = AuthorInfoAgent()
-                authors, source_label, warning, paper_meta = _resolve_authors_for_paper(
-                    paper, agent
-                )
-                if warning:
-                    st.warning(warning)
-                if not authors:
-                    if paper_meta:
-                        agent.store_paper_metadata(paper.id, paper_meta)
-                        st.session_state[meta_ts_key] = datetime.utcnow()
-                    st.info("No authors found to research.")
-                    return
-                author_infos = agent.fetch_authors_info(authors)
-                st.session_state[state_key] = author_infos
-                st.session_state[source_key] = source_label
-                st.session_state[meta_key] = paper_meta
-                if paper_meta:
-                    agent.store_paper_metadata(paper.id, paper_meta)
-                    st.session_state[meta_ts_key] = datetime.utcnow()
-                agent.store_author_infos(paper.id, author_infos)
-                st.session_state[author_ts_key] = datetime.utcnow()
-            except Exception as e:
-                st.error(f"Failed to fetch author information: {e}")
-
-    author_infos = st.session_state.get(state_key, [])
-    if not author_infos:
-        st.info("No author profiles loaded yet. Use the button above to start.")
-        return
-
-    source_label = st.session_state.get(source_key)
-    if source_label:
-        st.caption(f"Author list source: {source_label}")
-    author_ts = st.session_state.get(author_ts_key)
     if author_ts:
         st.caption(f"Cached author info updated: {_format_timestamp(author_ts)}")
 
-    paper_meta = st.session_state.get(meta_key)
     if paper_meta:
-        meta_ts = st.session_state.get(meta_ts_key)
         if meta_ts:
             st.caption(f"Cached paper metadata updated: {_format_timestamp(meta_ts)}")
         _render_paper_metadata(paper_meta)
+
+    if not author_infos:
+        st.info("No author profiles available yet.")
+        return
 
     for info in author_infos:
         name = info.get("name", "Author")
@@ -626,15 +584,6 @@ def show_notes_tab(paper_id: int):
         st.error(f"Failed to load notes: {e}")
 
 
-def _split_authors(authors: str) -> list[str]:
-    cleaned = authors.replace(" and ", ", ")
-    return [author.strip() for author in cleaned.split(",") if author.strip()]
-
-
-def _is_arxiv_url(url: str) -> bool:
-    return "arxiv.org" in url.lower()
-
-
 def _extract_arxiv_id_from_url(url: str) -> str | None:
     match = re.search(r"arxiv\.org/(?:abs|pdf)/([^?#]+)", url)
     if not match:
@@ -644,6 +593,13 @@ def _extract_arxiv_id_from_url(url: str) -> str | None:
         arxiv_id = arxiv_id[:-4]
     arxiv_id = re.sub(r"v\d+$", "", arxiv_id)
     return arxiv_id or None
+
+
+def _extract_doi_from_url(url: str) -> str | None:
+    match = re.search(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", url, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(0).rstrip(").,;")
 
 
 def _get_arxiv_pdf_url(paper) -> str | None:
@@ -675,70 +631,6 @@ def _render_copy_button(text: str, key: str, label: str = "Copy") -> None:
         </script>
     """
     components.html(html, height=42)
-
-
-def _resolve_authors_for_paper(
-    paper, agent: AuthorInfoAgent
-) -> tuple[list[dict[str, Any]], str, str | None, dict[str, Any] | None]:
-    authors = [{"name": name, "author_id": None} for name in _split_authors(paper.authors or "")]
-    if not _is_arxiv_url(paper.url or ""):
-        return authors, "Database", None, None
-
-    arxiv_id = _extract_arxiv_id_from_url(paper.url or "") or paper.arxiv_id
-    if not arxiv_id:
-        warning = "Could not parse arXiv ID from the paper URL."
-        return authors, "Database", warning, None
-
-    paper_meta = None
-    semantic_authors: list[dict[str, Any]] = []
-    try:
-        semantic_id = f"ARXIV:{arxiv_id}"
-        paper_meta = agent.fetch_paper_metadata(semantic_id)
-        semantic_authors = _extract_semantic_scholar_authors(paper_meta)
-    except Exception as exc:
-        logger.warning("Semantic Scholar paper metadata fetch failed: %s", exc)
-
-    if semantic_authors:
-        return semantic_authors, "Semantic Scholar", None, paper_meta
-
-    arxiv_authors: list[dict[str, Any]] = []
-    try:
-        searcher = ArxivSearch(max_results=1)
-        arxiv_paper = searcher.get_paper_by_id(arxiv_id)
-        arxiv_authors = [
-            {"name": name, "author_id": None}
-            for name in _split_authors(arxiv_paper.get("authors", ""))
-        ]
-    except Exception as exc:
-        logger.warning("arXiv metadata fetch failed: %s", exc)
-        arxiv_authors = []
-
-    if arxiv_authors:
-        return arxiv_authors, "arXiv", None, paper_meta
-
-    warning = "No authors found via Semantic Scholar or arXiv; using database metadata."
-    return authors, "Database", warning, paper_meta
-
-
-def _extract_semantic_scholar_authors(
-    paper_meta: dict[str, Any] | None
-) -> list[dict[str, Any]]:
-    if not paper_meta:
-        return []
-    authors = paper_meta.get("authors") or []
-    entries: list[dict[str, Any]] = []
-    for author in authors:
-        if isinstance(author, dict):
-            name = author.get("name")
-            author_id = author.get("authorId")
-        else:
-            name = author
-            author_id = None
-        if isinstance(name, str) and name.strip():
-            entries.append({"name": name.strip(), "author_id": author_id})
-        elif author_id:
-            entries.append({"name": "Unknown author", "author_id": author_id})
-    return entries
 
 
 def _render_paper_metadata(paper_meta: dict[str, Any]) -> None:

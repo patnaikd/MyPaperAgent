@@ -11,9 +11,8 @@ A modern web interface for MyPaperAgent, providing an intuitive way to manage yo
 - Update paper status with one click
 
 ### ➕ Add Papers
-- Upload PDF files directly
 - Add papers from URLs (arXiv, DOI, direct PDF links)
-- Automatic text extraction and metadata parsing
+- Automatic text extraction and metadata fetching
 - Optional tagging and collection organization
 - Automatic RAG indexing for semantic search
 
@@ -103,7 +102,7 @@ src/ui/
 ├── app.py              # Main application with navigation
 ├── pages/              # Individual page modules
 │   ├── library.py      # Paper library view
-│   ├── add_paper.py    # PDF upload and URL input
+│   ├── add_paper.py    # URL input
 │   ├── paper_detail.py # Paper details with AI features
 │   ├── search.py       # Semantic search interface
 │   ├── discover.py     # arXiv paper discovery
@@ -116,12 +115,10 @@ src/ui/
 ### Adding Your First Paper
 
 1. Click "➕ Add Paper" in the sidebar
-2. Choose upload method:
-   - **Upload PDF**: Drag and drop or select a PDF file
-   - **From URL**: Paste arXiv URL, DOI, or direct PDF link
+2. Paste an arXiv URL, DOI, or direct PDF link
 3. Optionally add tags and collection
 4. Click "Add Paper"
-5. Paper is automatically indexed for search
+5. Paper metadata and author profiles are fetched automatically and indexed for search
 
 ### Exploring a Paper
 
@@ -212,7 +209,6 @@ src/ui/
 
 ## Known Limitations
 
-- File upload limited by Streamlit's default (200MB)
 - Large papers may take time to process
 - OCR quality depends on PDF scan quality
 - Embedding generation requires API calls (costs/limits apply)

@@ -1,6 +1,7 @@
 """Agent for gathering author background information from web sources."""
 import json
 import logging
+import time
 from datetime import datetime
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -55,7 +56,8 @@ class AuthorInfoAgent(BaseAgent):
             return None
 
         logger.info("Requesting Semantic Scholar paper batch for %s", paper_id)
-        response = self.session.post(
+        response = self._request_with_retry(
+            "POST",
             f"{SEMANTIC_SCHOLAR_API_URL}/paper/batch",
             params={"fields": SEMANTIC_SCHOLAR_PAPER_FIELDS},
             json={"ids": [paper_id]},
@@ -238,7 +240,7 @@ class AuthorInfoAgent(BaseAgent):
             semantic_info = None
             if author_id:
                 semantic_info = self._fetch_semantic_scholar_by_id(author_id)
-            if not semantic_info:
+            if not semantic_info and not author_id:
                 semantic_info = self._fetch_semantic_scholar(author_name)
             if semantic_info:
                 info.update(semantic_info)
@@ -262,7 +264,8 @@ class AuthorInfoAgent(BaseAgent):
             "limit": 1,
             "fields": "name,affiliations,homepage,url,paperCount,citationCount,hIndex",
         }
-        search_response = self.session.get(
+        search_response = self._request_with_retry(
+            "GET",
             f"{SEMANTIC_SCHOLAR_API_URL}/author/search",
             params=search_params,
             timeout=20,
@@ -288,7 +291,8 @@ class AuthorInfoAgent(BaseAgent):
                 "papers.year,papers.authors,papers.fieldsOfStudy"
             )
         }
-        detail_response = self.session.get(
+        detail_response = self._request_with_retry(
+            "GET",
             f"{SEMANTIC_SCHOLAR_API_URL}/author/{author_id}",
             params=detail_params,
             timeout=20,
@@ -428,6 +432,43 @@ class AuthorInfoAgent(BaseAgent):
             body_preview = f"{body_preview[:2000]}... (truncated)"
         logger.info("%s %s %s -> %s", label, method, url, status)
         logger.debug("%s response: %s", label, body_preview)
+
+    def _request_with_retry(
+        self, method: str, url: str, **kwargs: Any
+    ) -> requests.Response:
+        max_retries = 5
+        backoff_seconds = 1.0
+        response: Optional[requests.Response] = None
+
+        for attempt in range(max_retries + 1):
+            response = self.session.request(method, url, **kwargs)
+            if response.status_code != 429:
+                return response
+
+            if attempt >= max_retries:
+                break
+
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    wait_seconds = max(float(retry_after), backoff_seconds)
+                except ValueError:
+                    wait_seconds = backoff_seconds
+            else:
+                wait_seconds = backoff_seconds
+
+            logger.warning(
+                "Semantic Scholar rate limited (429). Retrying in %.1fs (attempt %d/%d).",
+                wait_seconds,
+                attempt + 1,
+                max_retries,
+            )
+            time.sleep(wait_seconds)
+            backoff_seconds *= 2
+
+        if response is None:
+            raise requests.RequestException("No response received from Semantic Scholar.")
+        return response
 
     def _normalize_authors(self, authors: list[Any]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []

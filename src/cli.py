@@ -57,13 +57,13 @@ def add_paper(
         # Check if source is a file or URL
         if Path(source).exists():
             # Add from PDF file
-            with console.status("[bold yellow]Extracting text and metadata..."):
+            with console.status("[bold yellow]Extracting text..."):
                 paper_id = manager.add_paper_from_pdf(
                     Path(source), tags=tags_list, collection_name=collection
                 )
         else:
             # Add from URL
-            with console.status("[bold yellow]Downloading and processing PDF..."):
+            with console.status("[bold yellow]Fetching metadata and processing PDF..."):
                 paper_id = manager.add_paper_from_url(
                     source, tags=tags_list, collection_name=collection
                 )

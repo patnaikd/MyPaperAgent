@@ -38,6 +38,7 @@ class TextChunker:
 
         Uses semantic chunking based on paragraphs when possible,
         falling back to fixed-size chunking for very long paragraphs.
+        Limits chunks to 1-2 paragraphs for tighter retrieval granularity.
 
         Args:
             text: Text to chunk
@@ -54,6 +55,7 @@ class TextChunker:
         chunks = []
         current_chunk = []
         current_tokens = 0
+        max_paragraphs = 2
 
         for paragraph in paragraphs:
             para_tokens = self._count_tokens(paragraph)
@@ -71,9 +73,13 @@ class TextChunker:
                 sub_chunks = self._chunk_by_tokens(paragraph)
                 for sub_chunk in sub_chunks:
                     chunks.append(self._create_chunk(sub_chunk, len(chunks), metadata))
+                continue
 
             # If adding paragraph would exceed size, save current chunk
-            elif current_tokens + para_tokens > self.chunk_size:
+            if current_chunk and (
+                current_tokens + para_tokens > self.chunk_size
+                or len(current_chunk) >= max_paragraphs
+            ):
                 if current_chunk:
                     chunk_text = "\n\n".join(current_chunk)
                     chunks.append(self._create_chunk(chunk_text, len(chunks), metadata))
@@ -84,20 +90,22 @@ class TextChunker:
                     overlap_text = current_chunk[-1] if current_chunk else ""
                     overlap_tokens = self._count_tokens(overlap_text)
 
-                    if overlap_tokens <= self.chunk_overlap:
-                        current_chunk = [overlap_text, paragraph]
-                        current_tokens = overlap_tokens + para_tokens
+                    if (
+                        overlap_tokens <= self.chunk_overlap
+                        and overlap_tokens + para_tokens <= self.chunk_size
+                    ):
+                        current_chunk = [overlap_text]
+                        current_tokens = overlap_tokens
                     else:
-                        current_chunk = [paragraph]
-                        current_tokens = para_tokens
+                        current_chunk = []
+                        current_tokens = 0
                 else:
-                    current_chunk = [paragraph]
-                    current_tokens = para_tokens
+                    current_chunk = []
+                    current_tokens = 0
 
             # Add paragraph to current chunk
-            else:
-                current_chunk.append(paragraph)
-                current_tokens += para_tokens
+            current_chunk.append(paragraph)
+            current_tokens += para_tokens
 
         # Add final chunk
         if current_chunk:
