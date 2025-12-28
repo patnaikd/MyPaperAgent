@@ -626,12 +626,15 @@ def show_references_tab(paper_id: int) -> None:
 
     st.caption(f"Loaded {len(references)} references from Semantic Scholar.")
 
+    manager = PaperManager()
+    related_map = _get_related_paper_map()
     for index, ref in enumerate(references, start=1):
         title = ref.get("title") or "Untitled"
         year = ref.get("year")
         authors = _format_reference_authors(ref.get("authors"))
         ref_id = ref.get("paperId") or ref.get("paper_id")
         semantic_url = _semantic_scholar_paper_url(ref_id) if ref_id else None
+        existing_paper = _resolve_related_paper(manager, related_map, ref_id)
 
         with st.container():
             cols = st.columns([4, 1.2])
@@ -647,12 +650,21 @@ def show_references_tab(paper_id: int) -> None:
                 if semantic_url:
                     st.markdown(f"[View on Semantic Scholar]({semantic_url})")
             with cols[1]:
-                if ref_id and st.button(
-                    "➕ Add Paper",
-                    key=f"add_ref_{paper_id}_{ref_id}_{index}",
-                ):
-                    _add_related_paper(str(ref_id))
-                elif not ref_id:
+                if existing_paper:
+                    if st.button(
+                        "📖 Open Paper",
+                        key=f"open_ref_{paper_id}_{ref_id}_{index}",
+                    ):
+                        st.session_state.selected_paper_id = existing_paper.id
+                        st.session_state.current_page = "paper_detail"
+                        st.rerun()
+                elif ref_id:
+                    if st.button(
+                        "➕ Add Paper",
+                        key=f"add_ref_{paper_id}_{ref_id}_{index}",
+                    ):
+                        _add_related_paper(str(ref_id))
+                else:
                     st.caption("No ID available")
 
         st.markdown("---")
@@ -677,12 +689,15 @@ def show_citations_tab(paper_id: int) -> None:
 
     st.caption(f"Loaded {len(citations)} citations from Semantic Scholar.")
 
+    manager = PaperManager()
+    related_map = _get_related_paper_map()
     for index, citation in enumerate(citations, start=1):
         title = citation.get("title") or "Untitled"
         year = citation.get("year")
         authors = _format_reference_authors(citation.get("authors"))
         cite_id = citation.get("paperId") or citation.get("paper_id")
         semantic_url = _semantic_scholar_paper_url(cite_id) if cite_id else None
+        existing_paper = _resolve_related_paper(manager, related_map, cite_id)
 
         with st.container():
             cols = st.columns([4, 1.2])
@@ -698,12 +713,21 @@ def show_citations_tab(paper_id: int) -> None:
                 if semantic_url:
                     st.markdown(f"[View on Semantic Scholar]({semantic_url})")
             with cols[1]:
-                if cite_id and st.button(
-                    "➕ Add Paper",
-                    key=f"add_cite_{paper_id}_{cite_id}_{index}",
-                ):
-                    _add_related_paper(str(cite_id))
-                elif not cite_id:
+                if existing_paper:
+                    if st.button(
+                        "📖 Open Paper",
+                        key=f"open_cite_{paper_id}_{cite_id}_{index}",
+                    ):
+                        st.session_state.selected_paper_id = existing_paper.id
+                        st.session_state.current_page = "paper_detail"
+                        st.rerun()
+                elif cite_id:
+                    if st.button(
+                        "➕ Add Paper",
+                        key=f"add_cite_{paper_id}_{cite_id}_{index}",
+                    ):
+                        _add_related_paper(str(cite_id))
+                else:
                     st.caption("No ID available")
 
         st.markdown("---")
@@ -746,6 +770,37 @@ def _semantic_scholar_paper_url(paper_id: str | None) -> str | None:
     return f"https://www.semanticscholar.org/paper/{paper_id}"
 
 
+def _get_related_paper_map() -> dict[str, int]:
+    stored = st.session_state.get("related_paper_map")
+    if isinstance(stored, dict):
+        return stored
+    return {}
+
+
+def _remember_related_paper(semantic_id: str, paper_id: int) -> None:
+    related_map = _get_related_paper_map()
+    related_map[str(semantic_id)] = paper_id
+    st.session_state["related_paper_map"] = related_map
+
+
+def _resolve_related_paper(
+    manager: PaperManager,
+    related_map: dict[str, int],
+    semantic_id: str | None,
+) -> Any:
+    if not semantic_id:
+        return None
+
+    mapped_id = related_map.get(str(semantic_id))
+    if mapped_id:
+        try:
+            return manager.get_paper(mapped_id)
+        except Exception:
+            return None
+
+    return manager.get_paper_by_semantic_scholar_id(str(semantic_id))
+
+
 def _format_reference_authors(authors: Any) -> str | None:
     if not authors:
         return None
@@ -773,15 +828,24 @@ def _add_related_paper(reference_id: str) -> None:
             if not paper_meta:
                 st.warning("No Semantic Scholar metadata returned for this reference.")
                 return
+            manager = PaperManager()
+            semantic_id = paper_meta.get("paperId") or paper_meta.get("paper_id")
+            if semantic_id:
+                existing_paper = manager.get_paper_by_semantic_scholar_id(str(semantic_id))
+                if existing_paper:
+                    st.info(f"Paper already in library (ID {existing_paper.id}).")
+                    return
             external_ids = paper_meta.get("externalIds") or {}
             arxiv_id = _extract_arxiv_id_from_external_ids(external_ids)
             if not arxiv_id:
                 st.info("No arXiv ID found for this reference.")
                 return
             pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-            manager = PaperManager()
             new_paper_id = manager.add_paper_from_url(pdf_url)
+            if semantic_id:
+                _remember_related_paper(str(semantic_id), new_paper_id)
             st.success(f"Added paper {new_paper_id} from arXiv {arxiv_id}.")
+            st.rerun()
         except Exception as e:
             st.error(f"Failed to add reference: {e}")
 

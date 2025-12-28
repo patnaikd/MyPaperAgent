@@ -105,6 +105,7 @@ class PaperManager:
                 publication_date=metadata.get("publication_date"),
                 doi=metadata.get("doi"),
                 arxiv_id=metadata.get("arxiv_id"),
+                semantic_scholar_paper_id=metadata.get("semantic_scholar_paper_id"),
                 file_path=str(stored_path),
                 full_text=result["text"],
                 page_count=result["page_count"],
@@ -249,6 +250,18 @@ class PaperManager:
             raise PaperNotFoundError(f"Paper with ID {paper_id} not found")
 
         return paper
+
+    def get_paper_by_semantic_scholar_id(
+        self, semantic_id: str
+    ) -> Optional[Paper]:
+        """Get a paper by Semantic Scholar paper ID."""
+        if not semantic_id:
+            return None
+        return (
+            self.session.query(Paper)
+            .filter(Paper.semantic_scholar_paper_id == semantic_id)
+            .first()
+        )
 
     def list_papers(
         self,
@@ -406,6 +419,11 @@ class PaperManager:
             paper.doi = metadata["doi"]
         if metadata.get("arxiv_id"):
             paper.arxiv_id = metadata["arxiv_id"]
+        if (
+            metadata.get("semantic_scholar_paper_id")
+            and not paper.semantic_scholar_paper_id
+        ):
+            paper.semantic_scholar_paper_id = metadata["semantic_scholar_paper_id"]
         if metadata.get("journal"):
             paper.journal = metadata["journal"]
         if metadata.get("year"):
@@ -516,6 +534,8 @@ class PaperManager:
             journal = paper_meta.get("venue")
 
         return {
+            "semantic_scholar_paper_id": paper_meta.get("paperId")
+            or paper_meta.get("paper_id"),
             "title": paper_meta.get("title"),
             "authors": authors_text,
             "abstract": paper_meta.get("abstract"),

@@ -1,4 +1,5 @@
 """Database models and initialization for MyPaperAgent."""
+import json
 import logging
 from datetime import datetime
 from enum import Enum
@@ -65,6 +66,7 @@ class Paper(Base):
     publication_date = Column(String(50), nullable=True)
     doi = Column(String(100), nullable=True, unique=True, index=True)
     arxiv_id = Column(String(50), nullable=True, index=True)
+    semantic_scholar_paper_id = Column(String(100), nullable=True, index=True)
     url = Column(String(500), nullable=True)
     speechify_url = Column(String(500), nullable=True)
     file_path = Column(String(500), nullable=True)  # Local PDF path
@@ -306,6 +308,19 @@ class PaperSemanticScholar(Base):
         return f"<PaperSemanticScholar(paper_id={self.paper_id})>"
 
 
+class AppMetadata(Base):
+    """Application-level metadata for one-time tasks."""
+
+    __tablename__ = "app_metadata"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<AppMetadata(key='{self.key}')>"
+
 # Database session management
 _engine = None
 _SessionLocal = None
@@ -348,6 +363,7 @@ def ensure_database_initialized(engine) -> None:
         inspector = inspect(engine)
     _ensure_paper_columns(engine, inspector)
     _ensure_paper_constraints(engine, inspector)
+    _ensure_semantic_scholar_backfill(engine, inspector)
 
 
 def _ensure_paper_columns(engine, inspector) -> None:
@@ -358,6 +374,7 @@ def _ensure_paper_columns(engine, inspector) -> None:
     existing_columns = {column["name"] for column in inspector.get_columns("papers")}
     missing_columns = {
         "speechify_url": "speechify_url VARCHAR(500)",
+        "semantic_scholar_paper_id": "semantic_scholar_paper_id VARCHAR(100)",
     }
 
     for name, ddl in missing_columns.items():
@@ -413,6 +430,69 @@ def _ensure_paper_constraints(engine, inspector) -> None:
             index.create(bind=engine, checkfirst=True)
     except Exception as exc:
         logger.warning("Failed to recreate papers indexes: %s", exc)
+
+
+def _ensure_semantic_scholar_backfill(engine, inspector) -> None:
+    if "papers" not in inspector.get_table_names():
+        return
+    if "paper_semantic_scholar" not in inspector.get_table_names():
+        return
+    if "app_metadata" not in inspector.get_table_names():
+        return
+
+    key = "semantic_scholar_paper_id_backfill"
+    try:
+        with engine.begin() as connection:
+            row = connection.execute(
+                text("SELECT value FROM app_metadata WHERE key = :key"),
+                {"key": key},
+            ).fetchone()
+            if row:
+                return
+
+            results = connection.execute(
+                text("SELECT paper_id, response_json FROM paper_semantic_scholar")
+            ).mappings()
+            updated = 0
+            for result in results:
+                paper_id = result.get("paper_id")
+                raw_json = result.get("response_json")
+                if not paper_id or not raw_json:
+                    continue
+                try:
+                    payload = json.loads(raw_json)
+                except json.JSONDecodeError:
+                    continue
+                semantic_id = payload.get("paperId") or payload.get("paper_id")
+                if not semantic_id:
+                    continue
+                update_result = connection.execute(
+                    text(
+                        "UPDATE papers "
+                        "SET semantic_scholar_paper_id = :semantic_id "
+                        "WHERE id = :paper_id "
+                        "AND (semantic_scholar_paper_id IS NULL "
+                        "OR semantic_scholar_paper_id = '')"
+                    ),
+                    {"semantic_id": str(semantic_id), "paper_id": paper_id},
+                )
+                if update_result.rowcount:
+                    updated += update_result.rowcount
+
+            connection.execute(
+                text(
+                    "INSERT INTO app_metadata (key, value, created_at, updated_at) "
+                    "VALUES (:key, :value, :created_at, :updated_at)"
+                ),
+                {
+                    "key": key,
+                    "value": str(updated),
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                },
+            )
+    except Exception as exc:
+        logger.warning("Semantic Scholar paperId backfill failed: %s", exc)
 
 
 def _has_unique_arxiv_id(connection) -> bool:
