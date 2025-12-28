@@ -108,7 +108,7 @@ main() {
   ensure_db_initialized
 
   info "Launching Streamlit UI..."
-  python run_ui.py
+  uv run python3 run_ui.py
 }
 
 main "$@"
