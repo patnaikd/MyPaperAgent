@@ -1,16 +1,23 @@
 """Paper detail page - view paper with AI features."""
+import json
 import logging
+import re
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_pdf_viewer import pdf_viewer
 
+from src.agents.author_info import AuthorInfoAgent
 from src.agents.qa_agent import QAAgent
 from src.agents.quiz_generator import QuizGenerator
 from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.core.qa_manager import QAHistoryManager
+from src.discovery.arxiv_search import ArxivSearch
 from src.utils.database import NoteType
 from src.ui.ui_helpers import render_footer
 
@@ -75,9 +82,17 @@ def show_paper_detail_page():
         st.session_state[edit_key] = False
 
     if paper.url:
-        listen_col, url_col = st.columns([1, 4])
+        listen_col, copy_col, url_col  = st.columns([1, 1, 4])
         with url_col:
             st.markdown(f"**URL:** [{paper.url}]({paper.url})")
+        with copy_col:
+            arxiv_pdf_url = _get_arxiv_pdf_url(paper)
+            if arxiv_pdf_url:
+                _render_copy_button(
+                    arxiv_pdf_url,
+                    key=f"copy_arxiv_{paper_id}",
+                    label="Copy PDF URL",
+                )
         with listen_col:
             st.markdown(
                 f"""
@@ -141,23 +156,33 @@ def show_paper_detail_page():
     st.markdown("---")
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["💭 Summarize", "📄 View PDF", "❓ Ask Questions", "📝 Quiz", "📔 Notes"]
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        [
+            "💭 Summarize",
+            "👥 About Authors",
+            "📄 View PDF",
+            "❓ Ask Questions",
+            "📝 Quiz",
+            "📔 Notes",
+        ]
     )
 
     with tab1:
         show_summarize_tab(paper_id)
 
     with tab2:
-        show_pdf_tab(paper)
+        show_author_info_tab(paper)
 
     with tab3:
-        show_qa_tab(paper_id)
+        show_pdf_tab(paper)
 
     with tab4:
-        show_quiz_tab(paper_id)
+        show_qa_tab(paper_id)
 
     with tab5:
+        show_quiz_tab(paper_id)
+
+    with tab6:
         show_notes_tab(paper_id)
 
     render_footer()
@@ -227,6 +252,139 @@ def show_summarize_tab(paper_id: int):
 
     except Exception as e:
         st.warning(f"Could not load previous summaries: {e}")
+
+
+def show_author_info_tab(paper) -> None:
+    """Show author information gathered from web sources."""
+    st.markdown("### 👥 About Authors")
+
+    has_arxiv_source = _is_arxiv_url(paper.url or "")
+    authors = [{"name": name, "author_id": None} for name in _split_authors(paper.authors or "")]
+
+    state_key = f"author_info_{paper.id}"
+    meta_key = f"{state_key}_paper_meta"
+    source_key = f"{state_key}_source"
+    author_ts_key = f"{state_key}_authors_ts"
+    meta_ts_key = f"{state_key}_meta_ts"
+    if state_key not in st.session_state:
+        stored_authors, stored_authors_ts = AuthorInfoAgent.load_author_infos_with_timestamp(
+            paper.id
+        )
+        if stored_authors:
+            st.session_state[state_key] = stored_authors
+            st.session_state[source_key] = "Database"
+            st.session_state[author_ts_key] = stored_authors_ts
+    if meta_key not in st.session_state:
+        stored_meta, stored_meta_ts = AuthorInfoAgent.load_paper_metadata_with_timestamp(
+            paper.id
+        )
+        if stored_meta:
+            st.session_state[meta_key] = stored_meta
+            st.session_state[meta_ts_key] = stored_meta_ts
+
+    if not authors and not has_arxiv_source and not st.session_state.get(state_key):
+        st.info("No author metadata available for this paper.")
+        return
+
+    st.caption("Pulls data from public sources (Semantic Scholar, DBLP) when available.")
+
+    if st.button("🔍 Extract author information", type="primary", width="stretch"):
+        with st.spinner("Gathering author information..."):
+            try:
+                agent = AuthorInfoAgent()
+                authors, source_label, warning, paper_meta = _resolve_authors_for_paper(
+                    paper, agent
+                )
+                if warning:
+                    st.warning(warning)
+                if not authors:
+                    if paper_meta:
+                        agent.store_paper_metadata(paper.id, paper_meta)
+                        st.session_state[meta_ts_key] = datetime.utcnow()
+                    st.info("No authors found to research.")
+                    return
+                author_infos = agent.fetch_authors_info(authors)
+                st.session_state[state_key] = author_infos
+                st.session_state[source_key] = source_label
+                st.session_state[meta_key] = paper_meta
+                if paper_meta:
+                    agent.store_paper_metadata(paper.id, paper_meta)
+                    st.session_state[meta_ts_key] = datetime.utcnow()
+                agent.store_author_infos(paper.id, author_infos)
+                st.session_state[author_ts_key] = datetime.utcnow()
+            except Exception as e:
+                st.error(f"Failed to fetch author information: {e}")
+
+    author_infos = st.session_state.get(state_key, [])
+    if not author_infos:
+        st.info("No author profiles loaded yet. Use the button above to start.")
+        return
+
+    source_label = st.session_state.get(source_key)
+    if source_label:
+        st.caption(f"Author list source: {source_label}")
+    author_ts = st.session_state.get(author_ts_key)
+    if author_ts:
+        st.caption(f"Cached author info updated: {_format_timestamp(author_ts)}")
+
+    paper_meta = st.session_state.get(meta_key)
+    if paper_meta:
+        meta_ts = st.session_state.get(meta_ts_key)
+        if meta_ts:
+            st.caption(f"Cached paper metadata updated: {_format_timestamp(meta_ts)}")
+        _render_paper_metadata(paper_meta)
+
+    for info in author_infos:
+        name = info.get("name", "Author")
+        with st.expander(name, expanded=True):
+            if info.get("error"):
+                st.warning(info["error"])
+            introduction = info.get("introduction")
+            if introduction:
+                st.write(introduction)
+
+            affiliation = info.get("affiliation")
+            if affiliation:
+                st.markdown(f"**Affiliation:** {affiliation}")
+
+            homepage = info.get("homepage")
+            if homepage:
+                st.markdown(f"**Homepage:** [{homepage}]({homepage})")
+
+            semantic_url = info.get("semantic_scholar_url")
+            if semantic_url:
+                st.markdown(f"**Semantic Scholar:** [{semantic_url}]({semantic_url})")
+
+            dblp_url = info.get("dblp_url")
+            if dblp_url:
+                st.markdown(f"**DBLP:** [{dblp_url}]({dblp_url})")
+
+            top_papers = info.get("top_cited_papers") or []
+            if top_papers:
+                st.markdown("**Top cited papers:**")
+                for paper_info in top_papers:
+                    title = paper_info.get("title", "Untitled")
+                    citations = paper_info.get("citation_count")
+                    year = paper_info.get("year")
+                    label_parts = [title]
+                    if year:
+                        label_parts.append(str(year))
+                    if citations is not None:
+                        label_parts.append(f"{citations} citations")
+                    label = " · ".join(label_parts)
+                    url = paper_info.get("url")
+                    if url:
+                        st.markdown(f"- [{label}]({url})")
+                    else:
+                        st.markdown(f"- {label}")
+
+            coauthors = info.get("coauthors") or []
+            if coauthors:
+                st.markdown(f"**Top co-authors:** {', '.join(coauthors)}")
+
+            interests = info.get("research_interests") or []
+            if interests:
+                st.markdown(f"**Research interests:** {', '.join(interests)}")
 
 
 def show_pdf_tab(paper) -> None:
@@ -466,3 +624,151 @@ def show_notes_tab(paper_id: int):
 
     except Exception as e:
         st.error(f"Failed to load notes: {e}")
+
+
+def _split_authors(authors: str) -> list[str]:
+    cleaned = authors.replace(" and ", ", ")
+    return [author.strip() for author in cleaned.split(",") if author.strip()]
+
+
+def _is_arxiv_url(url: str) -> bool:
+    return "arxiv.org" in url.lower()
+
+
+def _extract_arxiv_id_from_url(url: str) -> str | None:
+    match = re.search(r"arxiv\.org/(?:abs|pdf)/([^?#]+)", url)
+    if not match:
+        return None
+    arxiv_id = match.group(1)
+    if arxiv_id.endswith(".pdf"):
+        arxiv_id = arxiv_id[:-4]
+    arxiv_id = re.sub(r"v\d+$", "", arxiv_id)
+    return arxiv_id or None
+
+
+def _get_arxiv_pdf_url(paper) -> str | None:
+    arxiv_id = _extract_arxiv_id_from_url(paper.url or "") or paper.arxiv_id
+    if not arxiv_id:
+        return None
+    return f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+
+
+def _render_copy_button(text: str, key: str, label: str = "Copy") -> None:
+    safe_text = json.dumps(text)
+    button_id = f"copy-btn-{key}"
+    html = f"""
+        <button id="{button_id}"
+            style="width:100%; padding:0.25rem 0.6rem; border-radius:0.5rem;
+                   border:1px solid #d0d7de; background:#ffffff; cursor:pointer;">
+            {label}
+        </button>
+        <script>
+            const btn = document.getElementById("{button_id}");
+            if (btn) {{
+                btn.addEventListener("click", () => {{
+                    navigator.clipboard.writeText({safe_text});
+                    const original = btn.textContent;
+                    btn.textContent = "Copied";
+                    setTimeout(() => btn.textContent = original, 1500);
+                }});
+            }}
+        </script>
+    """
+    components.html(html, height=42)
+
+
+def _resolve_authors_for_paper(
+    paper, agent: AuthorInfoAgent
+) -> tuple[list[dict[str, Any]], str, str | None, dict[str, Any] | None]:
+    authors = [{"name": name, "author_id": None} for name in _split_authors(paper.authors or "")]
+    if not _is_arxiv_url(paper.url or ""):
+        return authors, "Database", None, None
+
+    arxiv_id = _extract_arxiv_id_from_url(paper.url or "") or paper.arxiv_id
+    if not arxiv_id:
+        warning = "Could not parse arXiv ID from the paper URL."
+        return authors, "Database", warning, None
+
+    paper_meta = None
+    semantic_authors: list[dict[str, Any]] = []
+    try:
+        semantic_id = f"ARXIV:{arxiv_id}"
+        paper_meta = agent.fetch_paper_metadata(semantic_id)
+        semantic_authors = _extract_semantic_scholar_authors(paper_meta)
+    except Exception as exc:
+        logger.warning("Semantic Scholar paper metadata fetch failed: %s", exc)
+
+    if semantic_authors:
+        return semantic_authors, "Semantic Scholar", None, paper_meta
+
+    arxiv_authors: list[dict[str, Any]] = []
+    try:
+        searcher = ArxivSearch(max_results=1)
+        arxiv_paper = searcher.get_paper_by_id(arxiv_id)
+        arxiv_authors = [
+            {"name": name, "author_id": None}
+            for name in _split_authors(arxiv_paper.get("authors", ""))
+        ]
+    except Exception as exc:
+        logger.warning("arXiv metadata fetch failed: %s", exc)
+        arxiv_authors = []
+
+    if arxiv_authors:
+        return arxiv_authors, "arXiv", None, paper_meta
+
+    warning = "No authors found via Semantic Scholar or arXiv; using database metadata."
+    return authors, "Database", warning, paper_meta
+
+
+def _extract_semantic_scholar_authors(
+    paper_meta: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    if not paper_meta:
+        return []
+    authors = paper_meta.get("authors") or []
+    entries: list[dict[str, Any]] = []
+    for author in authors:
+        if isinstance(author, dict):
+            name = author.get("name")
+            author_id = author.get("authorId")
+        else:
+            name = author
+            author_id = None
+        if isinstance(name, str) and name.strip():
+            entries.append({"name": name.strip(), "author_id": author_id})
+        elif author_id:
+            entries.append({"name": "Unknown author", "author_id": author_id})
+    return entries
+
+
+def _render_paper_metadata(paper_meta: dict[str, Any]) -> None:
+    st.markdown("#### Semantic Scholar paper metadata")
+    title = paper_meta.get("title")
+    if title:
+        st.markdown(f"**Title:** {title}")
+    citation_count = paper_meta.get("citationCount")
+    reference_count = paper_meta.get("referenceCount")
+    counts = []
+    if citation_count is not None:
+        counts.append(f"{citation_count} citations")
+    if reference_count is not None:
+        counts.append(f"{reference_count} references")
+    if counts:
+        st.markdown(f"**Counts:** {' · '.join(counts)}")
+    is_open_access = paper_meta.get("isOpenAccess")
+    if isinstance(is_open_access, bool):
+        st.markdown(f"**Open access:** {'Yes' if is_open_access else 'No'}")
+    open_access_pdf = paper_meta.get("openAccessPdf")
+    if isinstance(open_access_pdf, dict):
+        pdf_url = open_access_pdf.get("url")
+        if pdf_url:
+            st.markdown(f"**Open access PDF:** [{pdf_url}]({pdf_url})")
+
+    with st.expander("Raw Semantic Scholar response"):
+        st.json(paper_meta)
+
+
+def _format_timestamp(value: datetime) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)

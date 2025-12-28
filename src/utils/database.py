@@ -94,6 +94,12 @@ class Paper(Base):
     paper_collections = relationship(
         "PaperCollection", back_populates="paper", cascade="all, delete-orphan"
     )
+    paper_authors = relationship(
+        "PaperAuthor", back_populates="paper", cascade="all, delete-orphan"
+    )
+    semantic_scholar = relationship(
+        "PaperSemanticScholar", back_populates="paper", uselist=False, cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Paper(id={self.id}, title='{self.title[:50]}...')>"
@@ -232,6 +238,70 @@ class Embedding(Base):
 
     def __repr__(self) -> str:
         return f"<Embedding(id={self.id}, paper_id={self.paper_id}, chunk={self.chunk_index})>"
+
+
+class Author(Base):
+    """Author metadata collected from external sources."""
+
+    __tablename__ = "authors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    semantic_scholar_id = Column(String(50), nullable=True, unique=True, index=True)
+    name = Column(String(200), nullable=True, index=True)
+    homepage = Column(String(500), nullable=True)
+    semantic_scholar_url = Column(String(500), nullable=True)
+    dblp_url = Column(String(500), nullable=True)
+    affiliation = Column(String(500), nullable=True)
+    introduction = Column(Text, nullable=True)
+    top_cited_papers = Column(Text, nullable=True)
+    coauthors = Column(Text, nullable=True)
+    research_interests = Column(Text, nullable=True)
+    sources = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    paper_links = relationship(
+        "PaperAuthor", back_populates="author", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Author(id={self.id}, name='{self.name}')>"
+
+
+class PaperAuthor(Base):
+    """Link table between papers and authors."""
+
+    __tablename__ = "paper_authors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False, index=True)
+    author_id = Column(Integer, ForeignKey("authors.id"), nullable=False, index=True)
+    author_order = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    paper = relationship("Paper", back_populates="paper_authors")
+    author = relationship("Author", back_populates="paper_links")
+
+    def __repr__(self) -> str:
+        return f"<PaperAuthor(paper_id={self.paper_id}, author_id={self.author_id})>"
+
+
+class PaperSemanticScholar(Base):
+    """Raw Semantic Scholar response stored by paper."""
+
+    __tablename__ = "paper_semantic_scholar"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False, unique=True, index=True)
+    response_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    paper = relationship("Paper", back_populates="semantic_scholar")
+
+    def __repr__(self) -> str:
+        return f"<PaperSemanticScholar(paper_id={self.paper_id})>"
 
 
 # Database session management
