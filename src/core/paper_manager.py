@@ -385,22 +385,9 @@ class PaperManager:
     def _find_existing_paper(
         self, doi: Optional[str] = None, arxiv_id: Optional[str] = None
     ) -> Optional[Paper]:
-        """Check if paper already exists by DOI or arXiv ID.
-
-        Args:
-            doi: DOI to check
-            arxiv_id: arXiv ID to check
-
-        Returns:
-            Existing paper or None
-        """
+        """Check if paper already exists by DOI."""
         if doi:
             paper = self.session.query(Paper).filter(Paper.doi == doi).first()
-            if paper:
-                return paper
-
-        if arxiv_id:
-            paper = self.session.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
             if paper:
                 return paper
 

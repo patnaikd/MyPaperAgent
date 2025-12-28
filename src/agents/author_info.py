@@ -431,7 +431,10 @@ class AuthorInfoAgent(BaseAgent):
         if len(body_preview) > 2000:
             body_preview = f"{body_preview[:2000]}... (truncated)"
         logger.info("%s %s %s -> %s", label, method, url, status)
-        logger.debug("%s response: %s", label, body_preview)
+        if status >= 400:
+            logger.warning("%s error response: %s", label, body_preview)
+        else:
+            logger.debug("%s response: %s", label, body_preview)
 
     def _request_with_retry(
         self, method: str, url: str, **kwargs: Any

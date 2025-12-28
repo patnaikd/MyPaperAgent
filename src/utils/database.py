@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    MetaData,
     String,
     Text,
     create_engine,
@@ -18,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.schema import CreateTable
 
 from src.utils.config import get_config
 
@@ -62,7 +64,7 @@ class Paper(Base):
     abstract = Column(Text, nullable=True)
     publication_date = Column(String(50), nullable=True)
     doi = Column(String(100), nullable=True, unique=True, index=True)
-    arxiv_id = Column(String(50), nullable=True, unique=True, index=True)
+    arxiv_id = Column(String(50), nullable=True, index=True)
     url = Column(String(500), nullable=True)
     speechify_url = Column(String(500), nullable=True)
     file_path = Column(String(500), nullable=True)  # Local PDF path
@@ -345,6 +347,7 @@ def ensure_database_initialized(engine) -> None:
         Base.metadata.create_all(bind=engine)
         inspector = inspect(engine)
     _ensure_paper_columns(engine, inspector)
+    _ensure_paper_constraints(engine, inspector)
 
 
 def _ensure_paper_columns(engine, inspector) -> None:
@@ -367,6 +370,66 @@ def _ensure_paper_columns(engine, inspector) -> None:
         except Exception as exc:
             logger.warning("Failed to add column '%s' to papers table: %s", name, exc)
 
+
+def _ensure_paper_constraints(engine, inspector) -> None:
+    """Ensure the papers table does not enforce uniqueness on arxiv_id."""
+    if "papers" not in inspector.get_table_names():
+        return
+
+    try:
+        with engine.connect() as connection:
+            if not _has_unique_arxiv_id(connection):
+                return
+    except Exception as exc:
+        logger.warning("Failed to inspect papers constraints: %s", exc)
+        return
+
+    logger.info("Removing UNIQUE constraint on papers.arxiv_id")
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+
+            metadata = MetaData()
+            new_table = Paper.__table__.to_metadata(metadata, name="papers_new")
+            connection.execute(CreateTable(new_table))
+
+            column_names = [column.name for column in new_table.columns]
+            columns_csv = ", ".join(column_names)
+            connection.execute(
+                text(
+                    f"INSERT INTO papers_new ({columns_csv}) "
+                    f"SELECT {columns_csv} FROM papers"
+                )
+            )
+            connection.execute(text("DROP TABLE papers"))
+            connection.execute(text("ALTER TABLE papers_new RENAME TO papers"))
+            connection.execute(text("PRAGMA foreign_keys=ON"))
+    except Exception as exc:
+        logger.warning("Failed to rebuild papers table: %s", exc)
+        return
+
+    try:
+        for index in Paper.__table__.indexes:
+            index.create(bind=engine, checkfirst=True)
+    except Exception as exc:
+        logger.warning("Failed to recreate papers indexes: %s", exc)
+
+
+def _has_unique_arxiv_id(connection) -> bool:
+    indexes = connection.execute(text("PRAGMA index_list('papers')")).mappings().all()
+    for index in indexes:
+        if not index.get("unique"):
+            continue
+        index_name = index.get("name")
+        if not index_name:
+            continue
+        columns = connection.execute(
+            text(f"PRAGMA index_info('{index_name}')")
+        ).mappings()
+        column_names = [row.get("name") for row in columns if row.get("name")]
+        if column_names == ["arxiv_id"]:
+            return True
+    return False
 
 def drop_all_tables() -> None:
     """Drop all tables (use with caution!)."""
