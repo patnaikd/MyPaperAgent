@@ -1,6 +1,7 @@
 """Paper detail page - view paper with AI features."""
 import json
 import re
+from urllib.parse import quote
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -295,6 +296,20 @@ def show_author_info_tab(paper) -> None:
     for info in author_infos:
         name = info.get("name", "Author")
         with st.expander(name, expanded=True):
+            if isinstance(name, str) and name.strip():
+                linkedin_url = _linkedin_search_url(name)
+                st.markdown(
+                    f"""
+                    <a href="{linkedin_url}" target="_blank"
+                       style="display:inline-flex; align-items:center; gap:0.4rem;
+                              text-decoration:none; border:1px solid #d0d7de;
+                              padding:0.25rem 0.6rem; border-radius:0.5rem;
+                              background:#ffffff; color:#111111; font-size:0.9rem;">
+                        🔗 LinkedIn
+                    </a>
+                    """,
+                    unsafe_allow_html=True,
+                )
             if info.get("error"):
                 st.warning(info["error"])
             introduction = info.get("introduction")
@@ -600,6 +615,10 @@ def _extract_doi_from_url(url: str) -> str | None:
     if not match:
         return None
     return match.group(0).rstrip(").,;")
+
+
+def _linkedin_search_url(name: str) -> str:
+    return f"https://www.linkedin.com/search/results/people/?keywords={quote(name)}"
 
 
 def _get_arxiv_pdf_url(paper) -> str | None:
