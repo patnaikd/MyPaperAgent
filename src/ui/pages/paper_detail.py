@@ -152,11 +152,12 @@ def show_paper_detail_page():
     st.markdown("---")
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
         [
             "💭 Summarize",
             "👥 About Authors",
             "📚 References",
+            "🧾 Citations",
             "📄 View PDF",
             "❓ Ask Questions",
             "📝 Quiz",
@@ -174,15 +175,18 @@ def show_paper_detail_page():
         show_references_tab(paper.id)
 
     with tab4:
-        show_pdf_tab(paper)
+        show_citations_tab(paper.id)
 
     with tab5:
-        show_qa_tab(paper_id)
+        show_pdf_tab(paper)
 
     with tab6:
-        show_quiz_tab(paper_id)
+        show_qa_tab(paper_id)
 
     with tab7:
+        show_quiz_tab(paper_id)
+
+    with tab8:
         show_notes_tab(paper_id)
 
     render_footer()
@@ -627,6 +631,7 @@ def show_references_tab(paper_id: int) -> None:
         year = ref.get("year")
         authors = _format_reference_authors(ref.get("authors"))
         ref_id = ref.get("paperId") or ref.get("paper_id")
+        semantic_url = _semantic_scholar_paper_url(ref_id) if ref_id else None
 
         with st.container():
             cols = st.columns([4, 1.2])
@@ -639,13 +644,66 @@ def show_references_tab(paper_id: int) -> None:
                     details.append(str(year))
                 if details:
                     st.caption(" · ".join(details))
+                if semantic_url:
+                    st.markdown(f"[View on Semantic Scholar]({semantic_url})")
             with cols[1]:
                 if ref_id and st.button(
                     "➕ Add Paper",
                     key=f"add_ref_{paper_id}_{ref_id}_{index}",
                 ):
-                    _add_reference_paper(str(ref_id))
+                    _add_related_paper(str(ref_id))
                 elif not ref_id:
+                    st.caption("No ID available")
+
+        st.markdown("---")
+
+
+def show_citations_tab(paper_id: int) -> None:
+    """Show Semantic Scholar citations."""
+    st.markdown("### 🧾 Citations")
+
+    paper_meta, meta_ts = AuthorInfoAgent.load_paper_metadata_with_timestamp(paper_id)
+    if not paper_meta:
+        st.info("No Semantic Scholar metadata available. Refresh in the Authors tab.")
+        return
+
+    citations = paper_meta.get("citations") or []
+    if meta_ts:
+        st.caption(f"Cached metadata updated: {_format_timestamp(meta_ts)}")
+
+    if not citations:
+        st.info("No citations available for this paper.")
+        return
+
+    st.caption(f"Loaded {len(citations)} citations from Semantic Scholar.")
+
+    for index, citation in enumerate(citations, start=1):
+        title = citation.get("title") or "Untitled"
+        year = citation.get("year")
+        authors = _format_reference_authors(citation.get("authors"))
+        cite_id = citation.get("paperId") or citation.get("paper_id")
+        semantic_url = _semantic_scholar_paper_url(cite_id) if cite_id else None
+
+        with st.container():
+            cols = st.columns([4, 1.2])
+            with cols[0]:
+                st.markdown(f"**{index}. {title}**")
+                details = []
+                if authors:
+                    details.append(authors)
+                if year:
+                    details.append(str(year))
+                if details:
+                    st.caption(" · ".join(details))
+                if semantic_url:
+                    st.markdown(f"[View on Semantic Scholar]({semantic_url})")
+            with cols[1]:
+                if cite_id and st.button(
+                    "➕ Add Paper",
+                    key=f"add_cite_{paper_id}_{cite_id}_{index}",
+                ):
+                    _add_related_paper(str(cite_id))
+                elif not cite_id:
                     st.caption("No ID available")
 
         st.markdown("---")
@@ -682,6 +740,12 @@ def _extract_arxiv_id_from_external_ids(external_ids: dict[str, Any]) -> str | N
     return None
 
 
+def _semantic_scholar_paper_url(paper_id: str | None) -> str | None:
+    if not paper_id:
+        return None
+    return f"https://www.semanticscholar.org/paper/{paper_id}"
+
+
 def _format_reference_authors(authors: Any) -> str | None:
     if not authors:
         return None
@@ -701,7 +765,7 @@ def _format_reference_authors(authors: Any) -> str | None:
     return None
 
 
-def _add_reference_paper(reference_id: str) -> None:
+def _add_related_paper(reference_id: str) -> None:
     with st.spinner("Fetching Semantic Scholar metadata..."):
         try:
             agent = AuthorInfoAgent()
