@@ -152,10 +152,11 @@ def show_paper_detail_page():
     st.markdown("---")
 
     # Tabs for different features
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
         [
             "💭 Summarize",
             "👥 About Authors",
+            "📚 References",
             "📄 View PDF",
             "❓ Ask Questions",
             "📝 Quiz",
@@ -170,15 +171,18 @@ def show_paper_detail_page():
         show_author_info_tab(paper)
 
     with tab3:
-        show_pdf_tab(paper)
+        show_references_tab(paper.id)
 
     with tab4:
-        show_qa_tab(paper_id)
+        show_pdf_tab(paper)
 
     with tab5:
-        show_quiz_tab(paper_id)
+        show_qa_tab(paper_id)
 
     with tab6:
+        show_quiz_tab(paper_id)
+
+    with tab7:
         show_notes_tab(paper_id)
 
     render_footer()
@@ -599,6 +603,54 @@ def show_notes_tab(paper_id: int):
         st.error(f"Failed to load notes: {e}")
 
 
+def show_references_tab(paper_id: int) -> None:
+    """Show Semantic Scholar references."""
+    st.markdown("### 📚 References")
+
+    paper_meta, meta_ts = AuthorInfoAgent.load_paper_metadata_with_timestamp(paper_id)
+    if not paper_meta:
+        st.info("No Semantic Scholar metadata available. Refresh in the Authors tab.")
+        return
+
+    references = paper_meta.get("references") or []
+    if meta_ts:
+        st.caption(f"Cached metadata updated: {_format_timestamp(meta_ts)}")
+
+    if not references:
+        st.info("No references available for this paper.")
+        return
+
+    st.caption(f"Loaded {len(references)} references from Semantic Scholar.")
+
+    for index, ref in enumerate(references, start=1):
+        title = ref.get("title") or "Untitled"
+        year = ref.get("year")
+        authors = _format_reference_authors(ref.get("authors"))
+        ref_id = ref.get("paperId") or ref.get("paper_id")
+
+        with st.container():
+            cols = st.columns([4, 1.2])
+            with cols[0]:
+                st.markdown(f"**{index}. {title}**")
+                details = []
+                if authors:
+                    details.append(authors)
+                if year:
+                    details.append(str(year))
+                if details:
+                    st.caption(" · ".join(details))
+            with cols[1]:
+                if ref_id and st.button(
+                    "➕ Add Paper",
+                    key=f"add_ref_{paper_id}_{ref_id}_{index}",
+                ):
+                    _add_reference_paper(str(ref_id))
+                elif not ref_id:
+                    st.caption("No ID available")
+
+        st.markdown("---")
+
+
 def _extract_arxiv_id_from_url(url: str) -> str | None:
     match = re.search(r"arxiv\.org/(?:abs|pdf)/([^?#]+)", url)
     if not match:
@@ -615,6 +667,59 @@ def _extract_doi_from_url(url: str) -> str | None:
     if not match:
         return None
     return match.group(0).rstrip(").,;")
+
+
+def _extract_arxiv_id_from_external_ids(external_ids: dict[str, Any]) -> str | None:
+    if not external_ids:
+        return None
+    for key in ("arxiv", "ArXiv", "ARXIV"):
+        value = external_ids.get(key)
+        if value:
+            return str(value)
+    for key, value in external_ids.items():
+        if key.lower() == "arxiv" and value:
+            return str(value)
+    return None
+
+
+def _format_reference_authors(authors: Any) -> str | None:
+    if not authors:
+        return None
+    if isinstance(authors, str):
+        return authors
+    if isinstance(authors, list):
+        names = []
+        for author in authors:
+            if isinstance(author, dict):
+                name = author.get("name")
+            else:
+                name = author
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+        if names:
+            return ", ".join(names)
+    return None
+
+
+def _add_reference_paper(reference_id: str) -> None:
+    with st.spinner("Fetching Semantic Scholar metadata..."):
+        try:
+            agent = AuthorInfoAgent()
+            paper_meta = agent.fetch_paper_metadata(reference_id)
+            if not paper_meta:
+                st.warning("No Semantic Scholar metadata returned for this reference.")
+                return
+            external_ids = paper_meta.get("externalIds") or {}
+            arxiv_id = _extract_arxiv_id_from_external_ids(external_ids)
+            if not arxiv_id:
+                st.info("No arXiv ID found for this reference.")
+                return
+            pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+            manager = PaperManager()
+            new_paper_id = manager.add_paper_from_url(pdf_url)
+            st.success(f"Added paper {new_paper_id} from arXiv {arxiv_id}.")
+        except Exception as e:
+            st.error(f"Failed to add reference: {e}")
 
 
 def _linkedin_search_url(name: str) -> str:
