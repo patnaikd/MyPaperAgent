@@ -3,7 +3,7 @@ import streamlit as st
 
 from src.core.paper_manager import PaperManager
 from src.utils.database import ReadingStatus
-from src.ui.ui_helpers import render_footer
+from src.ui.ui_helpers import build_paper_detail_query, render_footer
 
 
 def show_library_page():
@@ -169,10 +169,11 @@ def show_library_page():
                 except Exception as e:
                     st.error(f"Failed to update: {e}")
 
-            if cols[5].button("Open", key=f"open_{paper.id}"):
-                st.session_state.selected_paper_id = paper.id
-                st.session_state.current_page = "paper_detail"
-                st.rerun()
+            cols[5].link_button(
+                "Open",
+                build_paper_detail_query(paper.id),
+                use_container_width=True,
+            )
 
         st.markdown("---")
 

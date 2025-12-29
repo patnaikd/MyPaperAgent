@@ -18,7 +18,7 @@ from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.core.qa_manager import QAHistoryManager
 from src.utils.database import NoteType, ReadingStatus
-from src.ui.ui_helpers import render_footer
+from src.ui.ui_helpers import build_paper_detail_query, render_footer
 SPEECHIFY_ICON_URL = "https://cdn.speechify.com/web/assets/favicon.png"
 
 
@@ -53,7 +53,15 @@ def show_paper_detail_page():
     st.markdown("---")
 
     # Paper metadata
-    st.markdown(f"## {paper.title or 'Untitled Paper'}")
+    title_col, link_col = st.columns([4, 1])
+    with title_col:
+        st.markdown(f"## {paper.title or 'Untitled Paper'}")
+    with link_col:
+        st.link_button(
+            "🔗 Permalink",
+            build_paper_detail_query(paper_id),
+            use_container_width=True,
+        )
 
     col1, col2, col3 = st.columns(3)
     with col1:

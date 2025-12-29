@@ -6,6 +6,7 @@ from pathlib import Path
 import streamlit as st
 
 from src.utils.config import get_config
+from src.ui.ui_helpers import get_query_param, set_query_params
 
 
 config = get_config()
@@ -86,6 +87,42 @@ def cleanup_old_logs(log_dir: Path, keep: int, current_log: Path) -> list[Path]:
 
 _LOG_FILE = setup_logging()
 logger = logging.getLogger(__name__)
+
+# Query param synchronization for permalinks
+def _apply_query_params() -> None:
+    page_param = get_query_param("page")
+    paper_param = get_query_param("paper_id")
+    current_params = (page_param or "", paper_param or "")
+    last_params = st.session_state.get("last_query_params")
+    if last_params == current_params:
+        return
+    st.session_state["last_query_params"] = current_params
+    if paper_param and not page_param:
+        page_param = "paper_detail"
+    if page_param:
+        st.session_state.current_page = page_param
+    if paper_param:
+        try:
+            st.session_state.selected_paper_id = int(paper_param)
+        except ValueError:
+            logger.warning("Invalid paper_id query param: %s", paper_param)
+            st.session_state.selected_paper_id = None
+
+
+def _sync_query_params() -> None:
+    current_page = st.session_state.get("current_page")
+    paper_id = st.session_state.get("selected_paper_id")
+    page_param = get_query_param("page")
+    paper_param = get_query_param("paper_id")
+    if current_page == "paper_detail" and paper_id:
+        expected_page = "paper_detail"
+        expected_paper = str(paper_id)
+        if page_param != expected_page or paper_param != expected_paper:
+            set_query_params(page=expected_page, paper_id=expected_paper)
+        return
+
+    if page_param or paper_param:
+        set_query_params()
 
 # Custom CSS
 st.markdown("""
@@ -247,6 +284,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Initialize from query params when present
+_apply_query_params()
+
 # Initialize session state
 if "current_page" not in st.session_state:
     st.session_state.current_page = "library"
@@ -276,6 +316,7 @@ with st.sidebar:
 # Main content area
 def main():
     """Main application logic."""
+    _sync_query_params()
     current_page = st.session_state.current_page
 
     if current_page == "library":

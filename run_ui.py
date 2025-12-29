@@ -25,7 +25,6 @@ def main():
             "uv", "run", "streamlit", "run",
             str(app_path),
             "--server.port=8501",
-            "--server.headless=true",
             "--browser.gatherUsageStats=false"
         ])
     except KeyboardInterrupt:
