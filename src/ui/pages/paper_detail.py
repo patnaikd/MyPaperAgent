@@ -17,7 +17,7 @@ from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
 from src.core.qa_manager import QAHistoryManager
-from src.utils.database import NoteType
+from src.utils.database import NoteType, ReadingStatus
 from src.ui.ui_helpers import render_footer
 SPEECHIFY_ICON_URL = "https://cdn.speechify.com/web/assets/favicon.png"
 
@@ -63,6 +63,33 @@ def show_paper_detail_page():
     with col3:
         status_colors = {"unread": "🔵", "reading": "🟡", "completed": "🟢", "archived": "⚫"}
         st.metric("Status", f"{status_colors.get(paper.status, '⚪')} {paper.status.title()}")
+        status_options = [
+            (ReadingStatus.UNREAD.value, "🔵 unread"),
+            (ReadingStatus.READING.value, "🟡 reading"),
+            (ReadingStatus.COMPLETED.value, "🟢 completed"),
+            (ReadingStatus.ARCHIVED.value, "⚫ archived"),
+        ]
+        status_labels = [label for _, label in status_options]
+        status_to_label = {value: label for value, label in status_options}
+        label_to_status = {label: value for value, label in status_options}
+        current_label = status_to_label.get(
+            paper.status,
+            status_to_label[ReadingStatus.UNREAD.value],
+        )
+        selected_label = st.selectbox(
+            "Update status",
+            status_labels,
+            index=status_labels.index(current_label),
+            key=f"detail_status_{paper_id}",
+        )
+        new_status = label_to_status[selected_label]
+        if new_status != paper.status:
+            try:
+                manager.update_paper_status(paper_id, new_status)
+                st.success("Status updated.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to update status: {e}")
 
     if paper.authors:
         st.markdown(f"**Authors:** {paper.authors}")
