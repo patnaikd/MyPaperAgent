@@ -4,7 +4,8 @@ import streamlit as st
 from src.core.paper_manager import PaperManager
 from src.core.project_manager import ProjectManager, ProjectError
 from src.utils.database import ReadingStatus
-from src.ui.ui_helpers import build_paper_detail_query, render_footer
+from src.ui.ui_helpers import build_paper_detail_query, render_footer, sort_papers
+from src.ui.components.paper_table import render_paper_table
 
 
 def show_library_page():
@@ -85,20 +86,8 @@ def show_library_page():
                    (p.authors and search_lower in p.authors.lower())
             ]
 
-        status_priority = {
-            ReadingStatus.READING.value: 0,
-            ReadingStatus.UNREAD.value: 1,
-            ReadingStatus.COMPLETED.value: 2,
-            ReadingStatus.ARCHIVED.value: 3,
-        }
-        papers = sorted(
-            papers,
-            key=lambda paper: (
-                status_priority.get(paper.status, 4),
-                -(paper.year or -1),
-                (paper.title or "").lower(),
-            ),
-        )
+        # Apply sorting
+        papers = sort_papers(papers)
 
         if not papers:
             st.info("No papers found. Add your first paper using the 'Add Paper' page!")
@@ -165,84 +154,15 @@ def show_library_page():
                             del st.session_state[key]
                     st.session_state.selected_paper_ids = set()
                     st.rerun()
-            st.markdown("---")
+            st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
 
-        # Display papers in a table-like layout with actions
-        status_options = [
-            ("unread", "🔵 unread"),
-            ("reading", "🟡 reading"),
-            ("completed", "🟢 completed"),
-            ("archived", "⚫ archived"),
-        ]
-        status_labels = [label for _, label in status_options]
-        status_to_label = {value: label for value, label in status_options}
-        label_to_status = {label: value for value, label in status_options}
-
-        header = st.columns([0.4, 3.1, 2, 2, 0.8, 0.8, 1.4, 0.8])
-        # header[0] is for checkbox
-        header[1].markdown("**Title**")
-        header[2].markdown("**Authors**")
-        header[3].markdown("**Projects**")
-        header[4].markdown("**Year**")
-        header[5].markdown("**Pages**")
-        header[6].markdown("**Status**")
-        header[7].markdown("**Open**")
-        st.markdown("---")
-
-        for paper in papers:
-            authors = ""
-            if paper.authors:
-                authors = paper.authors if len(paper.authors) <= 60 else paper.authors[:57] + "..."
-
-            # Get projects for this paper
-            paper_projects = project_manager.get_projects_for_paper(paper.id)
-            project_names = ", ".join([p.name for p in paper_projects]) if paper_projects else ""
-            if len(project_names) > 40:
-                project_names = project_names[:37] + "..."
-
-            cols = st.columns([0.4, 3.1, 2, 2, 0.8, 0.8, 1.4, 0.8])
-            
-            # Checkbox
-            is_selected = paper.id in st.session_state.selected_paper_ids
-            if cols[0].checkbox(f"Select {paper.title[:20]}...", value=is_selected, key=f"select_{paper.id}", label_visibility="collapsed"):
-                if paper.id not in st.session_state.selected_paper_ids:
-                    st.session_state.selected_paper_ids.add(paper.id)
-                    st.rerun()
-            else:
-                if paper.id in st.session_state.selected_paper_ids:
-                    st.session_state.selected_paper_ids.remove(paper.id)
-                    st.rerun()
-
-            cols[1].write(paper.title or "Untitled Paper")
-            cols[2].write(authors)
-            cols[3].write(project_names)
-            cols[4].write(paper.year or "")
-            cols[5].write(paper.page_count or "")
-
-            current_label = status_to_label.get(paper.status, "🔵 unread")
-            selected_label = cols[6].selectbox(
-                "Status",
-                status_labels,
-                index=status_labels.index(current_label),
-                key=f"status_{paper.id}",
-                label_visibility="collapsed",
-            )
-            new_status = label_to_status[selected_label]
-            if new_status != paper.status:
-                try:
-                    manager.update_paper(paper.id, status=new_status)
-                    st.success("Status updated!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to update: {e}")
-
-            cols[7].link_button(
-                "Open",
-                build_paper_detail_query(paper.id),
-                use_container_width=True,
-            )
-
-        st.markdown("---")
+        # Display papers using shared component
+        render_paper_table(
+            papers=papers,
+            paper_manager=manager,
+            project_manager=project_manager,
+            show_selection=True
+        )
 
     except Exception as e:
         st.error(f"Error loading papers: {e}")

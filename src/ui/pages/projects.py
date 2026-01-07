@@ -2,7 +2,8 @@
 import streamlit as st
 from src.core.project_manager import ProjectManager, ProjectError
 from src.core.paper_manager import PaperManager
-from src.ui.ui_helpers import build_paper_detail_query, render_footer
+from src.ui.ui_helpers import build_paper_detail_query, render_footer, sort_papers
+from src.ui.components.paper_table import render_paper_table
 
 def show_projects_page():
     """Display projects page."""
@@ -20,6 +21,10 @@ def show_projects_page():
     # Check for selected project in session state
     if "selected_project_id" not in st.session_state:
         st.session_state.selected_project_id = None
+    
+    # Bulk actions state
+    if "selected_paper_ids" not in st.session_state:
+        st.session_state.selected_paper_ids = set()
 
     if st.session_state.selected_project_id:
         show_project_detail(project_manager, paper_manager)
@@ -164,18 +169,59 @@ def show_project_detail(project_manager: ProjectManager, paper_manager: PaperMan
                     project_manager.add_paper_to_project(paper_to_add.id, project.id)
                     st.success(f"Added '{paper_to_add.title}' to project!")
                     st.rerun()
+        
+        # Bulk Action Bar
+        selected_ids = st.session_state.get("selected_paper_ids", set())
+        if selected_ids:
+            with st.container():
+                st.markdown(f"**With {len(selected_ids)} selected paper(s):**")
+                col_proj, col_btn, col_clr = st.columns([3, 1, 1])
+                
+                projects = project_manager.list_projects()
+                if not projects:
+                    col_proj.warning("Create a project first to use bulk actions.")
+                else:
+                    target_project = col_proj.selectbox(
+                        "Target Project",
+                        options=[p for p in projects if p.id != project.id],
+                        format_func=lambda p: p.name,
+                        key="bulk_project_select_proj_view",
+                        label_visibility="collapsed"
+                    )
+                    if col_btn.button("Add to Project", type="primary", use_container_width=True, key="bulk_add_btn_proj"):
+                        try:
+                            for paper_id in selected_ids:
+                                project_manager.add_paper_to_project(paper_id, target_project.id)
+                                key = f"select_{paper_id}"
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            st.success(f"Added {len(selected_ids)} papers to '{target_project.name}'!")
+                            st.session_state.selected_paper_ids = set()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                
+                if col_clr.button("Clear Selection", use_container_width=True, key="bulk_clr_btn_proj"):
+                    for paper_id in list(st.session_state.selected_paper_ids):
+                        key = f"select_{paper_id}"
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.session_state.selected_paper_ids = set()
+                    st.rerun()
+            st.markdown("<div style='margin-bottom: 0.5rem;'></div>", unsafe_allow_html=True)
 
-        # List papers
+        # List papers using shared component
         papers = project_manager.get_papers_in_project(project.id)
         if not papers:
             st.info("This project has no papers yet.")
         else:
-            for paper in papers:
-                cols = st.columns([4, 1, 1])
-                cols[0].markdown(f"**{paper.title}**")
-                cols[1].link_button("Open", build_paper_detail_query(paper.id), use_container_width=True)
-                if cols[2].button("Remove", key=f"remove_{paper.id}"):
-                    project_manager.remove_paper_from_project(paper.id, project.id)
-                    st.success("Paper removed from project.")
-                    st.rerun()
-                st.divider()
+            # Sort papers consistently
+            papers = sort_papers(papers)
+            
+            render_paper_table(
+                papers=papers,
+                paper_manager=paper_manager,
+                project_manager=project_manager,
+                show_selection=True,
+                project_context_id=project.id
+            )

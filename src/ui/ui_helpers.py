@@ -4,6 +4,8 @@ from typing import Any
 
 import streamlit as st
 
+from src.utils.database import ReadingStatus
+
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +52,21 @@ def set_query_params(**params: str | int | None) -> None:
 def build_paper_detail_query(paper_id: int | str) -> str:
     """Build a relative permalink for a paper detail page."""
     return f"?page=paper_detail&paper_id={paper_id}"
+
+
+def sort_papers(papers: list) -> list:
+    """Sort papers by status priority, year (desc), and title."""
+    status_priority = {
+        ReadingStatus.READING.value: 0,
+        ReadingStatus.UNREAD.value: 1,
+        ReadingStatus.COMPLETED.value: 2,
+        ReadingStatus.ARCHIVED.value: 3,
+    }
+    return sorted(
+        papers,
+        key=lambda paper: (
+            status_priority.get(paper.status, 4),
+            -(paper.year or -1),
+            (paper.title or "").lower(),
+        ),
+    )
