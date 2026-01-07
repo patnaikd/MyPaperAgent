@@ -16,6 +16,7 @@ from src.agents.quiz_generator import QuizGenerator
 from src.agents.summarizer import SummarizationAgent
 from src.core.note_manager import NoteManager
 from src.core.paper_manager import PaperManager
+from src.core.project_manager import ProjectManager
 from src.core.qa_manager import QAHistoryManager
 from src.utils.database import NoteType, ReadingStatus
 from src.ui.ui_helpers import build_paper_detail_query, render_footer
@@ -36,9 +37,10 @@ def show_paper_detail_page():
 
     try:
         manager = PaperManager()
+        project_manager = ProjectManager()
         paper = manager.get_paper(paper_id)
     except Exception as e:
-        st.error(f"Failed to load paper: {e}")
+        st.error(f"Failed to load paper or initialize project manager: {e}")
         render_footer()
         return
 
@@ -98,6 +100,10 @@ def show_paper_detail_page():
                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to update status: {e}")
+
+    # Project Management
+    st.markdown("---")
+    show_project_management(paper_id, project_manager)
 
     if paper.authors:
         st.markdown(f"**Authors:** {paper.authors}")
@@ -948,6 +954,50 @@ def _render_paper_metadata(paper_meta: dict[str, Any]) -> None:
 
 
 def _format_timestamp(value: datetime) -> str:
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d %H:%M")
-    return str(value)
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
+def show_project_management(paper_id: int, project_manager: ProjectManager):
+    """Show and manage project associations for the paper."""
+    st.markdown("### 📁 Projects")
+    
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        current_projects = project_manager.get_projects_for_paper(paper_id)
+        if current_projects:
+            st.write("**Current Projects:**")
+            for project in current_projects:
+                c1, c2 = st.columns([3, 1])
+                c1.markdown(f"📁 **{project.name}**")
+                if c2.button("Remove", key=f"remove_proj_{project.id}_{paper_id}"):
+                    project_manager.remove_paper_from_project(paper_id, project.id)
+                    st.success(f"Removed from '{project.name}'")
+                    st.rerun()
+        else:
+            st.info("No projects yet.")
+
+    with col_right:
+        st.write("**Add to Project:**")
+        all_projects = project_manager.list_projects()
+        current_ids = {p.id for p in current_projects}
+        available_projects = [p for p in all_projects if p.id not in current_ids]
+
+        if not available_projects:
+            if not all_projects:
+                st.warning("No projects found.")
+            else:
+                st.success("Associated with all projects!")
+        else:
+            c1, c2 = st.columns([3, 1])
+            target_project = c1.selectbox(
+                "Select Project",
+                options=available_projects,
+                format_func=lambda p: p.name,
+                key=f"add_to_proj_select_detail_{paper_id}",
+                label_visibility="collapsed"
+            )
+            if c2.button("Add", key=f"add_to_proj_btn_detail_{paper_id}", type="primary", use_container_width=True):
+                project_manager.add_paper_to_project(paper_id, target_project.id)
+                st.success(f"Added to '{target_project.name}'!")
+                st.rerun()
