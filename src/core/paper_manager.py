@@ -19,7 +19,7 @@ from src.agents.author_info import AuthorInfoAgent
 from src.discovery.arxiv_search import ArxivSearch
 from src.processing.pdf_extractor import PDFExtractor
 from src.utils.config import get_config
-from src.utils.database import Paper, ReadingStatus, get_session
+from src.utils.database import Paper, ReadingStatus, get_session, Project, PaperProject
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class PaperManager:
         self,
         pdf_path: Path,
         tags: Optional[list[str]] = None,
-        collection_name: Optional[str] = None,
+        project_name: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> int:
         """Add a paper from a PDF file.
@@ -124,9 +124,9 @@ class PaperManager:
             if tags:
                 self._add_tags(paper.id, tags)
 
-            # Add to collection if provided
-            if collection_name:
-                self._add_to_collection(paper.id, collection_name)
+            # Add to project if provided
+            if project_name:
+                self._add_to_project(paper.id, project_name)
 
             return paper.id
 
@@ -139,7 +139,7 @@ class PaperManager:
         self,
         url: str,
         tags: Optional[list[str]] = None,
-        collection_name: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> int:
         """Add a paper from a URL.
 
@@ -180,7 +180,7 @@ class PaperManager:
                 paper_id = self.add_paper_from_pdf(
                     temp_pdf,
                     tags=tags,
-                    collection_name=collection_name,
+                    project_name=project_name,
                     metadata=metadata,
                 )
 
@@ -722,32 +722,30 @@ class PaperManager:
         self.session.commit()
         logger.info(f"Added {len(tags)} tags to paper {paper_id}")
 
-    def _add_to_collection(self, paper_id: int, collection_name: str) -> None:
-        """Add paper to a collection.
+    def _add_to_project(self, paper_id: int, project_name: str) -> None:
+        """Add paper to a project.
 
         Args:
             paper_id: Paper ID
-            collection_name: Collection name
+            project_name: Project name
         """
-        from src.utils.database import Collection, PaperCollection
-
-        # Find or create collection
-        collection = (
-            self.session.query(Collection)
-            .filter(Collection.name == collection_name)
+        # Find or create project
+        project = (
+            self.session.query(Project)
+            .filter(Project.name == project_name)
             .first()
         )
 
-        if not collection:
-            collection = Collection(name=collection_name)
-            self.session.add(collection)
+        if not project:
+            project = Project(name=project_name)
+            self.session.add(project)
             self.session.commit()
 
-        # Add paper to collection
-        paper_collection = PaperCollection(
-            paper_id=paper_id, collection_id=collection.id
+        # Add paper to project
+        paper_project = PaperProject(
+            paper_id=paper_id, project_id=project.id
         )
-        self.session.add(paper_collection)
+        self.session.add(paper_project)
         self.session.commit()
 
-        logger.info(f"Added paper {paper_id} to collection '{collection_name}'")
+        logger.info(f"Added paper {paper_id} to project '{project_name}'")

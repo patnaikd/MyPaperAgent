@@ -69,7 +69,7 @@ def show_url_section():
             help="Comma-separated tags",
             key="url_tags"
         )
-        collection = st.text_input("Collection", help="Add to a collection", key="url_collection")
+        project = st.text_input("Project", help="Add to a project", key="url_project")
         skip_index = st.checkbox("Skip automatic indexing", value=False, key="url_skip_index")
 
     if url:
@@ -84,7 +84,7 @@ def show_url_section():
                     paper_id = manager.add_paper_from_url(
                         url,
                         tags=tags_list,
-                        collection_name=collection if collection else None
+                        project_name=project if project else None
                     )
 
                     # Index for search

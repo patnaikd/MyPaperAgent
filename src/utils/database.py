@@ -95,8 +95,8 @@ class Paper(Base):
     embeddings = relationship(
         "Embedding", back_populates="paper", cascade="all, delete-orphan"
     )
-    paper_collections = relationship(
-        "PaperCollection", back_populates="paper", cascade="all, delete-orphan"
+    paper_projects = relationship(
+        "PaperProject", back_populates="paper", cascade="all, delete-orphan"
     )
     paper_authors = relationship(
         "PaperAuthor", back_populates="paper", cascade="all, delete-orphan"
@@ -129,41 +129,42 @@ class Note(Base):
         return f"<Note(id={self.id}, paper_id={self.paper_id}, type={self.note_type})>"
 
 
-class Collection(Base):
-    """Collections to organize papers."""
+class Project(Base):
+    """Projects to organize papers."""
 
-    __tablename__ = "collections"
+    __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(200), nullable=False, unique=True, index=True)
     description = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
-    paper_collections = relationship(
-        "PaperCollection", back_populates="collection", cascade="all, delete-orphan"
+    paper_projects = relationship(
+        "PaperProject", back_populates="project", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
-        return f"<Collection(id={self.id}, name='{self.name}')>"
+        return f"<Project(id={self.id}, name='{self.name}')>"
 
 
-class PaperCollection(Base):
-    """Many-to-many relationship between papers and collections."""
+class PaperProject(Base):
+    """Many-to-many relationship between papers and projects."""
 
-    __tablename__ = "paper_collections"
+    __tablename__ = "paper_projects"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, ForeignKey("papers.id"), nullable=False, index=True)
-    collection_id = Column(Integer, ForeignKey("collections.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
     added_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
-    paper = relationship("Paper", back_populates="paper_collections")
-    collection = relationship("Collection", back_populates="paper_collections")
+    paper = relationship("Paper", back_populates="paper_projects")
+    project = relationship("Project", back_populates="paper_projects")
 
     def __repr__(self) -> str:
-        return f"<PaperCollection(paper_id={self.paper_id}, collection_id={self.collection_id})>"
+        return f"<PaperProject(paper_id={self.paper_id}, project_id={self.project_id})>"
 
 
 class Tag(Base):

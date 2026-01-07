@@ -300,6 +300,7 @@ if "session_started" not in st.session_state:
 with st.sidebar:
     pages = {
         "🏠": ("Library", "library"),
+        "📁": ("Projects", "projects"),
         "➕": ("Add Paper", "add_paper"),
         "🔍": ("Search", "search"),
         "🌐": ("Discover", "discover"),
@@ -322,6 +323,9 @@ def main():
     if current_page == "library":
         from src.ui.pages.library import show_library_page
         show_library_page()
+    elif current_page == "projects":
+        from src.ui.pages.projects import show_projects_page
+        show_projects_page()
     elif current_page == "add_paper":
         from src.ui.pages.add_paper import show_add_paper_page
         show_add_paper_page()
